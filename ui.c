@@ -99,36 +99,49 @@ CMenu menu = {80,1,8,4,{
 };
 void initColorSln(ColorSultion *csln){
 
+	int initnum = 0;
 	//init menu color
-	csln->mr_bg = COLOR_WHITE;
-	csln->mr_s_bg = COLOR_BLUE;
-	csln->mr_tc_1 = COLOR_BLUE;
-	csln->mr_tc_2 = COLOR_CYAN;
-	csln->mr_s_tc_1 = COLOR_WHITE;
-	csln->mr_s_tc_2 = COLOR_YELLOW;
+	init_pair(++initnum, COLOR_BLUE, COLOR_WHITE);
+	csln->mr_tc_1 = initnum;
+	init_pair(++initnum, COLOR_CYAN, COLOR_WHITE);
+	csln->mr_tc_2 = initnum
+	init_pair(++initnum, COLOR_WHITE, COLOR_BLUE);
+	csln->mr_s_tc_1 = initnum;
+	init_pair(++initnum, COLOR_YELLOW, COLOR_BLUE);
+	csln->mr_s_tc_2 = initnum;
 
 	//init edit color
-	csln->er_bg = COLOR_BLACK;
-	csln->er_s_bg = COLOR_WHITE;
-	csln->er_tc = COLOR_WHITE;
-	csln->er_s_tc_1 = COLOR_BLACK;
-	csln->er_s_tc_2 = COLOR_CYAN;
-	csln->er_s_tc_3 = COLOR_MAGENTA; 
-	csln->er_f_ktc = COLOR_GREEN;   
-	csln->er_o_ktc = COLOR_YELLOW;  
-	csln->er_v_ktc = COLOR_BLUE;   
-	csln->er_e_tc = COLOR_BLACK;     
-	csln->er_c_tc_1 = COLOR_MAGENTA;    
-	csln->er_c_tc_2 = COLOR_CYAN;  
-	csln->er_w_bg = COLOR_BLACK;   
-	csln->er_w_tc = COLOR_RED;   
+	init_pair(++initnum, COLOR_WHITE, COLOR_BLACK);
+	csln->er_tc = initnum;
+	init_pair(++initnum, COLOR_BLACK, COLOR_WHITE);
+	csln->er_s_tc_1 = initnum;
+	init_pair(++initnum, COLOR_CYAN, COLOR_WHITE);
+	csln->er_s_tc_2 = initnum;
+	init_pair(++initnum, COLOR_MAGENTA, COLOR_WHITE);
+	csln->er_s_tc_3 = initnum; 
+	init_pair(++initnum, COLOR_GREEN, COLOR_BLACK);
+	csln->er_f_ktc = initnum;   
+	init_pair(++initnum, COLOR_YELLOW, COLOR_BLACK);
+	csln->er_o_ktc = initnum;  
+	init_pair(++initnum, COLOR_BLUE, COLOR_BLACK);
+	csln->er_v_ktc = initnum;   
+	init_pair(++initnum, COLOR_BLACK, COLOR_BLACK);
+	csln->er_e_tc = initnum;     
+	init_pair(++initnum, COLOR_MAGENTA, COLOR_BLACK);
+	csln->er_c_tc_1 = initnum;   
+	init_pair(++initnum, COLOR_CYAN, COLOR_BLACK); 
+	csln->er_c_tc_2 = initnum;  
+	init_pair(++initnum, COLOR_RED, COLOR_BLACK);
+	csln->er_w_tc = initnum;   
 
 
 	//init status color
-	csln->sr_bg = COLOR_WHITE;
-	csln->sr_tc_1 = COLOR_WHITE;
-	csln->sr_tc_2 = COLOR_RED;
-	csln->sr_tc_3 = COLOR_BLUE;
+	init_pair(++initnum, COLOR_BLACK, COLOR_WHITE);
+	csln->sr_tc_1 = initnum;
+	init_pair(++initnum, COLOR_RED, COLOR_WHITE);
+	csln->sr_tc_2 = initnum;
+	init_pair(++initnum, COLOR_BLUE, COLOR_WHITE);
+	csln->sr_tc_3 = initnum;
 }
 
 
@@ -190,21 +203,17 @@ void gotoxy(int x,int y){
 	move(y,x);
 	//printf("\033[%d;%dH",y,x);
 }
-void setbgtc(int bg,int tc){
-	static int initnum = 1;
-	init_pair(initnum, tc, bg);
-	attron(COLOR_PAIR(initnum));
-
-	if (initnum > 1000) initnum = 1;
+void setcolor(int pairnum){
+	attron(COLOR_PAIR(pairnum));
 
 	//printf("\033[%d;%dm\033[%d;%dm",bg,tc);
 
 }
-void drawItem(char *itemname,int c1,int c2,int bg){
+void drawItem(char *itemname,int c1,int c2){
 	int i = 0;
-	setbgtc(bg,c1);
+	setcolor(c1);
 	printw("%c",itemname[0]);
-	setbgtc(bg,c2);
+	setcolor(c2);
 	printw("%s",itemname+1);
 }
 
@@ -217,9 +226,9 @@ void printBg(int x,int y,int ex,int ey){
 		}
 	}
 }
-void drawWindow(int x,int y,int ex,int ey,int bg,int tc){
+void drawWindow(int x,int y,int ex,int ey,int tc){
 	int i;
-	setbgtc(bg,tc);
+	setcolor(tc);
 	printBg(x,y,ex,ey);
 	for(i = y; i <= ey; ++i){
 		gotoxy(x, i);
@@ -229,7 +238,7 @@ void drawWindow(int x,int y,int ex,int ey,int bg,int tc){
 	}
 	for(i = x; i <= ex; ++i){
 		gotoxy(i, ey);
-		printw("-");
+		printw("！");
 	}
 }
 
@@ -239,25 +248,25 @@ void drawMenuList(int index,int selSec){
 	int bg,tc1,tc2;
 
 	drawWindow(begin,mrey + 1,begin + menu.items[index].width,mrey + 1 + menu.items[index].num,
-		colorsln.mr_bg,colorsln.mr_tc_1);
+		colorsln.mr_tc_1);
 
 	for(i = 0; i < menu.items[index].num; ++i){
 		if (selSec == i){
-			bg = colorsln.mr_s_bg; tc1 = colorsln.mr_s_tc_1; tc2 = colorsln.mr_s_tc_2;
+			tc1 = colorsln.mr_s_tc_1; tc2 = colorsln.mr_s_tc_2;
 		}else{
-			bg = colorsln.mr_bg; tc1 = colorsln.mr_tc_1; tc2 = colorsln.mr_tc_2;
+			tc1 = colorsln.mr_tc_1; tc2 = colorsln.mr_tc_2;
 		}
-		setbgtc(bg,tc1);
+		setcolor(tc1);
 		printBg(begin + 1,mrey + 1 + i,begin + menu.items[index].width - 1,mrey + 1 + i);
 		gotoxy(begin + 2, mrey + 1 + i);
-		drawItem(menu.items[index].section[i],tc2,tc1,bg);
+		drawItem(menu.items[index].section[i],tc2,tc1);
 	}
 }
 
 void drawSelectMenu(int index,int selSec){
-	setbgtc(colorsln.mr_s_bg,colorsln.mr_s_tc_1);
+	setcolor(colorsln.mr_s_tc_1);
 	gotoxy(2 + mrx + index * menu.itemWidth,mry);
-	drawItem(menu.items[index].name,colorsln.mr_s_tc_2,colorsln.mr_s_tc_1,colorsln.mr_s_bg);
+	drawItem(menu.items[index].name,colorsln.mr_s_tc_2,colorsln.mr_s_tc_1);
 	drawMenuList(index,selSec);
 }
 
@@ -267,12 +276,12 @@ void drawMenu(){
 	mry = 0;
 	mrex = ttySize.ws_col - 1;
 	mrey = mry;
-	setbgtc(colorsln.mr_bg,colorsln.mr_tc_1);
+	setcolor(colorsln.mr_tc_1);
 	printBg(mrx,mry,mrex,mrey);
 
 	for(i = 0; i < menu.num; ++i){
 		gotoxy(MENUAHEAD + mrx + i * menu.itemWidth,mry);
-		drawItem(menu.items[i].name,colorsln.mr_tc_2,colorsln.mr_tc_1,colorsln.mr_bg);
+		drawItem(menu.items[i].name,colorsln.mr_tc_2,colorsln.mr_tc_1);
 	}
 }
 
@@ -283,17 +292,17 @@ void drawEditFrame(){
 	erex = ttySize.ws_col-1;
 	erey = ttySize.ws_row-2;
 
-	setbgtc(colorsln.er_bg,colorsln.er_tc);
+	setcolor(colorsln.er_tc);
 	printBg(erx,ery,erex,erey);
 
-	setbgtc(colorsln.er_bg,colorsln.er_tc);
+	setcolor(colorsln.er_tc);
 	for(i = erx; i < erex; ++i){
 		gotoxy(i,ery);
-		printw("=");
+		printw("��");
 	}
 	for(i = erx; i < erex; ++i){
 		gotoxy(i,erey);
-		printw("-");
+		printw("！");
 	}
 	gotoxy((erex-erx-6)/2 + erx,ery);
 	printw("shedit");
@@ -304,7 +313,7 @@ void drawStatusFrame(){
 	srex = ttySize.ws_col - 1;
 	srey = sry;
 
-	setbgtc(colorsln.sr_bg,colorsln.sr_tc_1);
+	setcolor(colorsln.sr_tc_1);
 	printBg(srx,sry,srex,srey);
 
 }
@@ -316,11 +325,17 @@ void setCurser(int x,int y){
 void drawWord(Word *w){
 	int i = 0;
 	if (w->type == NORMAL){
-		setbgtc(colorsln.er_bg,colorsln.er_tc);
+		setcolor(colorsln.er_tc);
 	}else if (w->type == FUNCTION){
-		setbgtc(colorsln.er_bg,colorsln.er_f_ktc);
+		setcolor(colorsln.er_f_ktc);
 	}else if (w->type == OPERATOR){
-		setbgtc(colorsln.er_bg,colorsln.er_o_ktc);
+		setcolor(colorsln.er_o_ktc);
+	}else if (w->type == KEYWORD){
+		setcolor(colorsln.er_v_ktc);
+	}else if (w->type == STRING){
+		setcolor(colorsln.er_c_tc_1);
+	}else if (w->type == EXPLAIN){
+		setcolor(colorsln.er_e_tc);
 	}
 	for(i = w->begin; i < w->end; ++i){
 		printw("%c",textInput.buffer[i]);
@@ -329,7 +344,7 @@ void drawWord(Word *w){
 
 void drawEditRoom(){
 	gotoxy(erx,ery+1);
-	setbgtc(colorsln.er_bg,colorsln.er_tc);
+	setcolor(colorsln.er_tc);
 	Word *w = textInput.head;
 	while(w != NULL){
 		drawWord(w);
@@ -347,27 +362,74 @@ void storeWindow(int x,int y,int wid,int hei){
 		inputWin = NULL;
 	}
 	inputWin = newwin(hei,wid,y,x);
-	box(inputWin,0,0);
-	overwrite(stdscr,inputWin);
+	box(inputWin,'|','！');
+	overlay(stdscr,inputWin);
+	//overwrite(stdscr,inputWin);
 }
 
-void updateView(){
-	overwrite(inputWin, stdscr);
-	if (shSystem.state == InMenu){
-		shSystem.menuIndex = shSystem.menuIndex < 0 ? 0 : shSystem.menuIndex;
-		shSystem.menuIndex = shSystem.menuIndex >= menu.num ? menu.num - 1 : shSystem.menuIndex;
+void updateMenu(){
+	shSystem.menuIndex = shSystem.menuIndex < 0 ? 0 : shSystem.menuIndex;
+	shSystem.menuIndex = shSystem.menuIndex >= menu.num ? menu.num - 1 : shSystem.menuIndex;
 
-		shSystem.menuSection = shSystem.menuSection < 0 ? 0 : shSystem.menuSection;
-		shSystem.menuSection = shSystem.menuSection >= menu.items[shSystem.menuIndex].num ? 
-			menu.items[shSystem.menuIndex].num - 1 : shSystem.menuIndex;
+	shSystem.menuSection = shSystem.menuSection < 0 ? 0 : shSystem.menuSection;
+	shSystem.menuSection = shSystem.menuSection >= menu.items[shSystem.menuIndex].num ? 
+		menu.items[shSystem.menuIndex].num - 1 : shSystem.menuSection;
 
-		storeWindow(shSystem.menuIndex * menu.width,1,menu.items[shSystem.menuIndex].width + 1,menu.items[shSystem.menuIndex].num + 1);
-		drawSelectMenu(shSystem.menuIndex,shSystem.menuSection);
+	storeWindow(shSystem.menuIndex * menu.width,0,menu.items[shSystem.menuIndex].width + 1,
+		menu.items[shSystem.menuIndex].num + 1);
+
+	drawSelectMenu(shSystem.menuIndex,shSystem.menuSection);
+
+}
+
+void drawSaveDialog(){
+	int x = 20,y = 20, w = 40, h = 10;
+	storeWindow(x,y,w,h);
+
+	int i;
+	setcolor(colorsln.mr_tc_1);
+	printBg(x,y,w+w,y+h);
+	for(i = y; i <= y+h; ++i){
+		gotoxy(x, i);
+		printw("|");
+		gotoxy(x+w,i);
+		printw("|");
 	}
-	if (shSystem.state == InDefault){
-		drawEditRoom();
-		drawStatusRoom();
-		//setCurser(shSystem.textX,shSystem.textY);
+	for(i = x; i <= x + w; ++i){
+		gotoxy(i, y);
+		printw("！");
+		gotoxy(i, y+h);
+		printw("！");
+	}
+	gotoxy(x + 5,y + h/2 - 1);
+	setcolor(colorsln.er_tc);
+
+	printw("%s",textInput.tmpstr);
+}
+
+void drawLoadDialog(){
+
+}
+void updateView(){
+	if (inputWin != NULL){
+		overwrite(inputWin, stdscr);
+		delwin(inputWin);
+		inputWin = NULL;
+	}
+	switch(){
+		case InMenu:
+			updateMenu();
+			break;
+		case InSave:
+			drawSaveDialog();
+			break;
+		case InLoad:
+			drawLoadDialog();
+			break;
+		case InDefault:
+			drawEditRoom();
+			drawStatusRoom();
+			break;
 	}
 	refresh();
 }

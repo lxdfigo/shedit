@@ -1,11 +1,17 @@
 #ifndef _CONTROLLER_SHEDIT
 #define _CONTROLLER_SHEDIT
 
+#define BOOL char
+//#define TRUE 1
+//#define FALSE 0
+
 enum SystemState{
 	InMenu,
 	InTextEdit,
 	InDebug,
 	InQuit,
+	InLoad,
+	InSave,
 	InDefault
 };
 
@@ -14,18 +20,19 @@ typedef struct {
 	int menuSection;
 	int textX;
 	int textY;
-	int isQuit;
+	BOOL isQuit;
 	enum SystemState lastState;
 	enum SystemState state;
-
 }SystemStatus;
 
 enum WordType{
 	FUNCTION,
-	PARAMER,
+	KEYWORD,
 	OPERATOR,
 	NORMAL,
 	STRING,
+	STRING2,
+	SELECTED,
 	EXPLAIN
 };
 
@@ -42,6 +49,7 @@ typedef struct{
 	long cur;
 	long length;
 	long printOffset;
+	char tmpstr[1024];
 	char *buffer;
 	Word *head;
 	Word *current;
