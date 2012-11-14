@@ -104,7 +104,7 @@ void initColorSln(ColorSultion *csln){
 	init_pair(++initnum, COLOR_BLUE, COLOR_WHITE);
 	csln->mr_tc_1 = initnum;
 	init_pair(++initnum, COLOR_CYAN, COLOR_WHITE);
-	csln->mr_tc_2 = initnum
+	csln->mr_tc_2 = initnum;
 	init_pair(++initnum, COLOR_WHITE, COLOR_BLUE);
 	csln->mr_s_tc_1 = initnum;
 	init_pair(++initnum, COLOR_YELLOW, COLOR_BLUE);
@@ -209,16 +209,18 @@ void setcolor(int pairnum){
 	//printf("\033[%d;%dm\033[%d;%dm",bg,tc);
 
 }
-void drawItem(char *itemname,int c1,int c2){
+void drawItem(int x,int y,char *itemname,int c1,int c2){
 	int i = 0;
+	gotoxy(x,y);
 	setcolor(c1);
 	printw("%c",itemname[0]);
 	setcolor(c2);
 	printw("%s",itemname+1);
 }
 
-void printBg(int x,int y,int ex,int ey){
+void printBg(int x,int y,int ex,int ey,int tc){
 	int i,j;
+	setcolor(tc);
 	for(i = y; i <= ey; ++i){
 		gotoxy(x,i);
 		for(j = x; j <= ex; ++j){
@@ -228,18 +230,40 @@ void printBg(int x,int y,int ex,int ey){
 }
 void drawWindow(int x,int y,int ex,int ey,int tc){
 	int i;
-	setcolor(tc);
-	printBg(x,y,ex,ey);
+	drawNoTopWindow(x,y,ex,ey,tc);
+	printBg(x,y,ex,ey,tc);
+
+	for(i = x; i <= ex; ++i){
+		gotoxy(i, y);
+		//printw("-");
+		printw("%c",196);
+	}
+	gotoxy(x, y);
+	printw("%c",218);
+	gotoxy(x, ey);
+	printw("%c",191);
+}
+void drawNoTopWindow(int x,int y,int ex,int ey,int tc){
+	int i;
+	printBg(x,y,ex,ey,tc);
+
 	for(i = y; i <= ey; ++i){
 		gotoxy(x, i);
-		printw("|");
+		//printw("|");
+		printw("%c",179);
 		gotoxy(ex,i);
-		printw("|");
+		//printw("|");
+		printw("%c",179);
 	}
 	for(i = x; i <= ex; ++i){
 		gotoxy(i, ey);
-		printw("！");
+		//printw("-");
+		printw("%c",196);
 	}
+	gotoxy(ex, y);
+	printw("%c",192);
+	gotoxy(ex, ey);
+	printw("%c",217);
 }
 
 void drawMenuList(int index,int selSec){
@@ -247,7 +271,7 @@ void drawMenuList(int index,int selSec){
 	int begin = index * menu.itemWidth;
 	int bg,tc1,tc2;
 
-	drawWindow(begin,mrey + 1,begin + menu.items[index].width,mrey + 1 + menu.items[index].num,
+	drawNoTopWindow(begin,mrey + 1,begin + menu.items[index].width,mrey + 1 + menu.items[index].num,
 		colorsln.mr_tc_1);
 
 	for(i = 0; i < menu.items[index].num; ++i){
@@ -256,17 +280,15 @@ void drawMenuList(int index,int selSec){
 		}else{
 			tc1 = colorsln.mr_tc_1; tc2 = colorsln.mr_tc_2;
 		}
-		setcolor(tc1);
-		printBg(begin + 1,mrey + 1 + i,begin + menu.items[index].width - 1,mrey + 1 + i);
-		gotoxy(begin + 2, mrey + 1 + i);
-		drawItem(menu.items[index].section[i],tc2,tc1);
+		printBg(begin + 1,mrey + 1 + i,begin + menu.items[index].width - 1,mrey + 1 + i,tc1);
+
+		drawItem(begin + 2, mrey + 1 + i,menu.items[index].section[i],tc2,tc1);
 	}
 }
 
 void drawSelectMenu(int index,int selSec){
-	setcolor(colorsln.mr_s_tc_1);
-	gotoxy(2 + mrx + index * menu.itemWidth,mry);
-	drawItem(menu.items[index].name,colorsln.mr_s_tc_2,colorsln.mr_s_tc_1);
+	drawItem(2 + mrx + index * menu.itemWidth,mry,
+		menu.items[index].name,colorsln.mr_s_tc_2,colorsln.mr_s_tc_1);
 	drawMenuList(index,selSec);
 }
 
@@ -276,12 +298,12 @@ void drawMenu(){
 	mry = 0;
 	mrex = ttySize.ws_col - 1;
 	mrey = mry;
-	setcolor(colorsln.mr_tc_1);
-	printBg(mrx,mry,mrex,mrey);
+
+	printBg(mrx,mry,mrex,mrey,colorsln.mr_tc_1);
 
 	for(i = 0; i < menu.num; ++i){
-		gotoxy(MENUAHEAD + mrx + i * menu.itemWidth,mry);
-		drawItem(menu.items[i].name,colorsln.mr_tc_2,colorsln.mr_tc_1);
+		drawItem(MENUAHEAD + mrx + i * menu.itemWidth,mry,
+			menu.items[i].name,colorsln.mr_tc_2,colorsln.mr_tc_1);
 	}
 }
 
@@ -292,17 +314,18 @@ void drawEditFrame(){
 	erex = ttySize.ws_col-1;
 	erey = ttySize.ws_row-2;
 
-	setcolor(colorsln.er_tc);
-	printBg(erx,ery,erex,erey);
+	printBg(erx,ery,erex,erey,colorsln.er_tc);
 
 	setcolor(colorsln.er_tc);
 	for(i = erx; i < erex; ++i){
 		gotoxy(i,ery);
-		printw("��");
+		//printw("=");
+		printw("%c",205);
 	}
 	for(i = erx; i < erex; ++i){
 		gotoxy(i,erey);
-		printw("！");
+		//printw("-");
+		printw("%c",196);
 	}
 	gotoxy((erex-erx-6)/2 + erx,ery);
 	printw("shedit");
@@ -313,8 +336,7 @@ void drawStatusFrame(){
 	srex = ttySize.ws_col - 1;
 	srey = sry;
 
-	setcolor(colorsln.sr_tc_1);
-	printBg(srx,sry,srex,srey);
+	printBg(srx,sry,srex,srey,colorsln.sr_tc_1);
 
 }
 
@@ -362,9 +384,9 @@ void storeWindow(int x,int y,int wid,int hei){
 		inputWin = NULL;
 	}
 	inputWin = newwin(hei,wid,y,x);
-	box(inputWin,'|','！');
-	overlay(stdscr,inputWin);
-	//overwrite(stdscr,inputWin);
+	//box(inputWin,'|','！');
+	//overlay(stdscr,inputWin);
+	overwrite(stdscr,inputWin);
 }
 
 void updateMenu(){
@@ -383,28 +405,18 @@ void updateMenu(){
 }
 
 void drawSaveDialog(){
-	int x = 20,y = 20, w = 40, h = 10;
+	int x,y,w,h;
+	w = 40;
+	h = 10;
+	x = (ttySize.ws_col - w) / 2;
+	y = (ttySize.ws_row - h) / 2 - 1;
+
 	storeWindow(x,y,w,h);
+	drawWindow(x,y,w+x,h+y,colorsln.mr_tc_1);
 
-	int i;
-	setcolor(colorsln.mr_tc_1);
-	printBg(x,y,w+w,y+h);
-	for(i = y; i <= y+h; ++i){
-		gotoxy(x, i);
-		printw("|");
-		gotoxy(x+w,i);
-		printw("|");
-	}
-	for(i = x; i <= x + w; ++i){
-		gotoxy(i, y);
-		printw("！");
-		gotoxy(i, y+h);
-		printw("！");
-	}
-	gotoxy(x + 5,y + h/2 - 1);
-	setcolor(colorsln.er_tc);
-
-	printw("%s",textInput.tmpstr);
+	x += 5; y += h/2 - 1;
+	printBg(x,y,x+w-10,y)
+	mvprintw(x,y,"%s",textInput.tmpstr);
 }
 
 void drawLoadDialog(){
@@ -416,8 +428,10 @@ void updateView(){
 		delwin(inputWin);
 		inputWin = NULL;
 	}
-	switch(){
+	curs_set(2);
+	switch(shSystem.state){
 		case InMenu:
+			curs_set(0);
 			updateMenu();
 			break;
 		case InSave:

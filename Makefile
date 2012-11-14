@@ -6,11 +6,11 @@ CC = cc
 shedit : $(objects)
 	$(CC) -o shedit $(objects) shedit.c -lcurses
 
-controller.o : controller.h
+controller.o : controller.h basic.h
 
-ui.o : ui.h controller.h
+ui.o : ui.h controller.h basic.h
 
-edit.o : edit.h controller.h
+edit.o : edit.h controller.h basic.h
 
 clean:
 	rm shedit $(objects)

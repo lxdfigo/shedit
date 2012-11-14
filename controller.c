@@ -21,3 +21,11 @@ void destroyCurses(){
 	refresh();
 	endwin();
 }
+
+void setSystemState(enum SystemState state){
+	shSystem.lastState = shSystem.state;
+	shSystem.state = state;
+}
+void revertSystemState(){
+	setSystemState(shSystem.lastState);
+}

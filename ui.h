@@ -1,7 +1,6 @@
 #ifndef _UI_SHEDIT
 #define _UI_SHEDIT
-
-
+#include "basic.h"
 
 void initUIModule();
 void destroyUIModule();

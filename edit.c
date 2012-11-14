@@ -9,13 +9,18 @@
 #include <fcntl.h>
 #include <ncurses.h>
 
+
+
 #define KEYNUM     14
 #define TEXTLENSIZE 1024
 const char * tmpfilename = "/tmp/shedit.tmp";
 FILE* tmpFile;
-KeyWord keywords[KEYNUM] = {{2,"if"},{2,"do"},{4,"done"},{5,"while"},{4,"case"},{4,"then"},{4,"else"},{4,"elif"}
-,{2,"fi"},{4,"esac"},{4,"echo"},{2,"ls"},{4,"more"},{8,"function"}
-};
+
+struct KeyWord{
+	int length;
+	char *str;
+}keywords[KEYNUM] = {{2,"if"},{2,"do"},{4,"done"},{5,"while"},{4,"case"},{4,"then"},{4,"else"},{4,"elif"}
+,{2,"fi"},{4,"esac"},{4,"echo"},{2,"ls"},{4,"more"},{8,"function"}};
 
 Word* addNewWord(){
 	Word *w = malloc(sizeof(Word));
@@ -31,7 +36,8 @@ Word* addNewWord(){
 void initEditModule(){
 	tmpFile = fopen(tmpfilename,"rw");
 	textInput.cur = 0;
-	textInput.tmpstr = "";
+	textInput.tmpstr = 0;
+	memset(textInput.tmpstr,0,sizeof(textInput.tmpstr));
 	textInput.printOffset = 0;
 	textInput.length = TEXTLENSIZE;
 	textInput.buffer = malloc(TEXTLENSIZE);
@@ -43,6 +49,7 @@ void destroyEditModule(){
 	fclose(tmpFile);
 	free(textInput.buffer);
 }
+
 BOOL isSeparate(char input){
 	Word *w = textInput.current;
 	if (input == '\"' || input == '\''){
@@ -133,7 +140,7 @@ void checkChar(char input){
 	}
 }
 
-void addchar(char input){
+void addCharInBuffer(char input){
 	textInput.buffer[textInput.cur] = input;
 	textInput.cur++;
 	if (textInput.cur >= textInput.length){
@@ -146,19 +153,42 @@ void addchar(char input){
 	checkChar(input);
 }
 
+void addCharInTemp(char input){
+	textInput.tmpstr[textInput.tmpcur] = input;
+	textInput.tmpcur++;
+}
+
+void addchar(char input){
+	switch(shSystem.state){
+		case InSave:
+		case InLoad:
+			addCharInTemp(input);
+			break;
+		case InDefault:
+			addCharInBuffer(input);
+			break;
+	}
+}
+
+void doExit(){
+	setSystemState(InQuit);
+	shSystem.isQuit = TRUE;
+}
+
 void doNewFile(){
 
 }
 
 void doSave(){
-	shSystem.state = shSystem.lastState;
-	shSystem.state = InSave;
-	memset(shSystem.tmpstr,0,sizeof(shSystem.tmpstr));
+	setSystemState(InSave);
+	memset(textInput.tmpstr,0,sizeof(textInput.tmpstr));
+	textInput.tmpcur = 0;
 }
 
 void doLoad(){
-	shSystem.state = shSystem.lastState;
-	shSystem.state = InLoad;
+	setSystemState(InLoad);
+	memset(textInput.tmpstr,0,sizeof(textInput.tmpstr));
+	textInput.tmpcur = 0;
 }
 void doEdit(){
 
@@ -206,10 +236,6 @@ void doMenu(){
 	}
 }
 
-void doExit(){
-	shSystem.state= InQuit;
-	shSystem.isQuit = TRUE;
-}
 
 void saveFile(){
 	int i = 0;
@@ -237,27 +263,26 @@ void loadFile(){
 }
 
 BOOL isValid(int input){
-	if (input >= 32 && input <= 126){
+	if (input == '\n' || input == ' ' || (input >= 32 && input <= 126)){
 		return TRUE;
 	}
 	return FALSE;
 }
 BOOL checkCommand(){
+	BOOL result = FALSE;
 	if (shSystem.state == InMenu){
 		doMenu();
-		shSystem.state = shSystem.lastState;
-		return TRUE;
+		result = TRUE;
 	}else if (shSystem.state == InSave){
 		saveFile();
-		shSystem.state = shSystem.lastState;
-		return TRUE;
+		result = TRUE;
 	}else if (shSystem.state == InLoad){
 		loadFile();
-		shSystem.state = shSystem.lastState;
-		return TRUE;
+		result = TRUE;
 	}
+	if (result == TRUE)	revertSystemState();
 
-	return FALSE;
+	return result;
 }
 
 BOOL inputHandler(){
@@ -266,11 +291,9 @@ BOOL inputHandler(){
 	switch(input){
 		case KEY_F(1):
 			if (shSystem.state == InMenu){
-				shSystem.state = shSystem.lastState;
-				shSystem.lastState = InMenu;
+				revertSystemState();
 			}else{
-				shSystem.lastState = shSystem.state;
-				shSystem.state = InMenu;
+				setSystemState(InMenu);
 			}
 			break;
 		case KEY_UP:
@@ -289,29 +312,29 @@ BOOL inputHandler(){
 			break;
 		case KEY_LEFT:
 			if (shSystem.state == InMenu){
-				shSystem.menuIndex++;
-			}else if (shSystem.state == InDefault){
-				shSystem.textX++;
-			}
-			break;
-		case KEY_RIGHT:
-			if (shSystem.state == InMenu){
 				shSystem.menuIndex--;
 			}else if (shSystem.state == InDefault){
 				shSystem.textX--;
 			}
 			break;
-		case KEY_ENTER:
+		case KEY_RIGHT:
+			if (shSystem.state == InMenu){
+				shSystem.menuIndex++;
+			}else if (shSystem.state == InDefault){
+				shSystem.textX++;
+			}
+			break;
+		case '\n'://KEY_ENTER:
 			if (!checkCommand()){
 				addchar(input);
 			}
 			break;
-		case KEY_EXIT:
+		case 27://KEY_EXIT:
 			doExit();
 			break;
 		default:
+			printw("Input is: %d : %c\n",input,input);
 			if (isValid(input)){
-				shSystem.state = InDefault;
 				addchar(input);
 			}
 			break;
