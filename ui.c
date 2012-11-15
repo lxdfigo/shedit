@@ -76,7 +76,6 @@ typedef struct{
 WINDOW *inputWin;
 int erx,erex,ery,erey,mrx,mrex,mry,mrey,srx,srex,sry,srey;
 ColorSultion colorsln;
-struct winsize ttySize;  
 CMenu menu = {80,1,8,4,{
 	{8,4,"FILE",  {
 		"New",
@@ -144,49 +143,14 @@ void initColorSln(ColorSultion *csln){
 	csln->sr_tc_3 = initnum;
 }
 
-
-//函数set_disp_mode用于控制是否开启输入回显功能  
-//如果option为0，则关闭回显，为1则打开回显  
-int set_disp_mode(int fd,int option) {  
-	int err;  
-	struct termios term;  
-	if(tcgetattr(fd,&term)==-1){  
-		perror("Cannot get the attribution of the terminal");  
-		return 1;  
-	}  
-	if(option)  
-		term.c_lflag|=ECHOFLAGS;  
-	else  
-		term.c_lflag &=~ECHOFLAGS;  
-	err=tcsetattr(fd,TCSAFLUSH,&term);  
-	if(err==-1 && err==EINTR){  
-		perror("Cannot set the attribution of the terminal");  
-		return 1;  
-	}  
-	return 0;  
-}  
-
-
 void initUIModule(){
-	if (isatty(STDOUT_FILENO) == 0)  
-		exit(1);  
-	if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &ttySize) < 0) {   
-		perror("ioctl TIOCGWINSZ error");    
-		exit(1);  
-	}  
-	//printf("%d rows, %d columns\n", ttySize.ws_row, ttySize.ws_col);  
-	set_disp_mode(STDIN_FILENO,0);
-
 	initColorSln(&colorsln);
 }
 
 void destroyUIModule(){
-	//printf("\033[0m");
-	set_disp_mode(STDIN_FILENO,1);
 	if (inputWin != NULL){
 		delwin(inputWin);
 		inputWin = NULL;
-		endwin();
 	}
 }
 
@@ -201,12 +165,9 @@ void resetView(){
 
 void gotoxy(int x,int y){
 	move(y,x);
-	//printf("\033[%d;%dH",y,x);
 }
 void setcolor(int pairnum){
 	attron(COLOR_PAIR(pairnum));
-
-	//printf("\033[%d;%dm\033[%d;%dm",bg,tc);
 
 }
 void drawItem(int x,int y,char *itemname,int c1,int c2){
@@ -228,6 +189,21 @@ void printBg(int x,int y,int ex,int ey,int tc){
 		}
 	}
 }
+void drawNoTopWindow(int x,int y,int ex,int ey,int tc){
+	int i;
+	printBg(x,y,ex,ey,tc);
+
+	for(i = y; i <= ey; ++i){
+		gotoxy(x, i);
+		printw("|");
+		gotoxy(ex,i);
+		printw("|");
+	}
+	for(i = x; i <= ex; ++i){
+		gotoxy(i, ey);
+		printw("-");
+	}
+}
 void drawWindow(int x,int y,int ex,int ey,int tc){
 	int i;
 	drawNoTopWindow(x,y,ex,ey,tc);
@@ -235,35 +211,8 @@ void drawWindow(int x,int y,int ex,int ey,int tc){
 
 	for(i = x; i <= ex; ++i){
 		gotoxy(i, y);
-		//printw("-");
-		printw("%c",196);
+		printw("-");
 	}
-	gotoxy(x, y);
-	printw("%c",218);
-	gotoxy(x, ey);
-	printw("%c",191);
-}
-void drawNoTopWindow(int x,int y,int ex,int ey,int tc){
-	int i;
-	printBg(x,y,ex,ey,tc);
-
-	for(i = y; i <= ey; ++i){
-		gotoxy(x, i);
-		//printw("|");
-		printw("%c",179);
-		gotoxy(ex,i);
-		//printw("|");
-		printw("%c",179);
-	}
-	for(i = x; i <= ex; ++i){
-		gotoxy(i, ey);
-		//printw("-");
-		printw("%c",196);
-	}
-	gotoxy(ex, y);
-	printw("%c",192);
-	gotoxy(ex, ey);
-	printw("%c",217);
 }
 
 void drawMenuList(int index,int selSec){
@@ -296,7 +245,7 @@ void drawMenu(){
 	int i = 0;
 	mrx = 0;
 	mry = 0;
-	mrex = ttySize.ws_col - 1;
+	mrex = COLS - 1;
 	mrey = mry;
 
 	printBg(mrx,mry,mrex,mrey,colorsln.mr_tc_1);
@@ -311,29 +260,29 @@ void drawEditFrame(){
 	int i;
 	erx = 0;
 	ery = mrey + 1;
-	erex = ttySize.ws_col-1;
-	erey = ttySize.ws_row-2;
+	erex = COLS-1;
+	erey = LINES-2;
 
 	printBg(erx,ery,erex,erey,colorsln.er_tc);
 
 	setcolor(colorsln.er_tc);
 	for(i = erx; i < erex; ++i){
 		gotoxy(i,ery);
-		//printw("=");
-		printw("%c",205);
+		printw("=");
+		//printw("%c",205);
 	}
 	for(i = erx; i < erex; ++i){
 		gotoxy(i,erey);
-		//printw("-");
-		printw("%c",196);
+		printw("-");
+		//printw("%c",196);
 	}
 	gotoxy((erex-erx-6)/2 + erx,ery);
 	printw("shedit");
 }
 void drawStatusFrame(){
 	srx = 0;
-	sry = ttySize.ws_row - 1;
-	srex = ttySize.ws_col - 1;
+	sry = LINES - 1;
+	srex = COLS - 1;
 	srey = sry;
 
 	printBg(srx,sry,srex,srey,colorsln.sr_tc_1);
@@ -384,8 +333,6 @@ void storeWindow(int x,int y,int wid,int hei){
 		inputWin = NULL;
 	}
 	inputWin = newwin(hei,wid,y,x);
-	//box(inputWin,'|','—');
-	//overlay(stdscr,inputWin);
 	overwrite(stdscr,inputWin);
 }
 
@@ -397,8 +344,8 @@ void updateMenu(){
 	shSystem.menuSection = shSystem.menuSection >= menu.items[shSystem.menuIndex].num ? 
 		menu.items[shSystem.menuIndex].num - 1 : shSystem.menuSection;
 
-	storeWindow(shSystem.menuIndex * menu.width,0,menu.items[shSystem.menuIndex].width + 1,
-		menu.items[shSystem.menuIndex].num + 1);
+	//storeWindow(shSystem.menuIndex * menu.width,0,5,12);
+	storeWindow(0,0,COLS,20);
 
 	drawSelectMenu(shSystem.menuIndex,shSystem.menuSection);
 
@@ -408,15 +355,15 @@ void drawSaveDialog(){
 	int x,y,w,h;
 	w = 40;
 	h = 10;
-	x = (ttySize.ws_col - w) / 2;
-	y = (ttySize.ws_row - h) / 2 - 1;
+	x = (COLS - w) / 2;
+	y = (LINES - h) / 2 - 1;
 
 	storeWindow(x,y,w,h);
 	drawWindow(x,y,w+x,h+y,colorsln.mr_tc_1);
 
 	x += 5; y += h/2 - 1;
-	printBg(x,y,x+w-10,y)
-	mvprintw(x,y,"%s",textInput.tmpstr);
+	printBg(x, y, x + w - 10, y,colorsln.er_tc);
+	mvprintw(y,x,"%s",textInput.tmpstr);
 }
 
 void drawLoadDialog(){

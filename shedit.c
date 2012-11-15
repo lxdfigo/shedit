@@ -9,10 +9,10 @@ int main(){
 	initUIModule();
 
 	resetView();
-	while(!shSystem.isQuit){
+	do{
 		inputHandler();
 		updateView();
-	}
+	}while(!shSystem.isQuit);
 
 	destroyUIModule();
 	destroyEditModule();

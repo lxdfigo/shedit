@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string.h>
 #include <ncurses.h>
 
 
@@ -22,13 +23,24 @@ struct KeyWord{
 }keywords[KEYNUM] = {{2,"if"},{2,"do"},{4,"done"},{5,"while"},{4,"case"},{4,"then"},{4,"else"},{4,"elif"}
 ,{2,"fi"},{4,"esac"},{4,"echo"},{2,"ls"},{4,"more"},{8,"function"}};
 
-Word* addNewWord(){
+Word* createNewWord(){
 	Word *w = malloc(sizeof(Word));
+	w->begin = 0;
+	w->end = 0;
+	w->next = NULL;
+	w->previous = NULL;
+	w->type = NORMAL;
+	return w;
+}
+
+Word *addNewWord(){
+	Word *w = createNewWord();
 	w->begin = textInput.cur;
 	w->end = w->begin;
 	w->next = NULL;
 	w->previous = textInput.current;
 	w->type = NORMAL;
+	textInput.current->next = w;
 	textInput.current = w;
 	return w;
 }
@@ -36,18 +48,25 @@ Word* addNewWord(){
 void initEditModule(){
 	tmpFile = fopen(tmpfilename,"rw");
 	textInput.cur = 0;
-	textInput.tmpstr = 0;
+	textInput.tmpcur = 0;
 	memset(textInput.tmpstr,0,sizeof(textInput.tmpstr));
 	textInput.printOffset = 0;
 	textInput.length = TEXTLENSIZE;
 	textInput.buffer = malloc(TEXTLENSIZE);
-	textInput.head = addNewWord();
+	textInput.head = createNewWord();
+	textInput.current = textInput.head;
 
 }
 
 void destroyEditModule(){
 	fclose(tmpFile);
 	free(textInput.buffer);
+	Word *w = textInput.head;
+	while (w != NULL){
+		Word *tmp = w;
+		w = w->next;
+		free(tmp);
+	}
 }
 
 BOOL isSeparate(char input){
@@ -132,20 +151,23 @@ void checkWord(Word * word){
 }
 void checkChar(char input){
 	if (isSeparate(input)){
-		Word * w = addNewWord();
-		w->end++;
-	}else{
-		textInput.current->end++;
-		checkWord(textInput.current);
+		textInput.current = addNewWord();
 	}
+	textInput.current->end = textInput.cur;
+	checkWord(textInput.current);
 }
 
 void addCharInBuffer(char input){
 	textInput.buffer[textInput.cur] = input;
 	textInput.cur++;
+	shSystem.textX++;
+	if (input == '\n' || shSystem.textX >= COLS){
+		shSystem.textY++;
+		shSystem.textX = 0;
+	}
 	if (textInput.cur >= textInput.length){
 		char *tmp = malloc(textInput.length + TEXTLENSIZE);
-		(tmp,textInput.buffer,textInput.length);
+		memcpy(tmp,textInput.buffer,textInput.length * sizeof(char));
 		free(textInput.buffer);
 		textInput.length += TEXTLENSIZE;
 		textInput.buffer = tmp;
@@ -240,26 +262,25 @@ void doMenu(){
 void saveFile(){
 	int i = 0;
 	FILE *file = NULL;
-	if (textInput.tmpstr[0] == 0){
-		return;
+	if (textInput.tmpstr[0] != 0){
+		file = fopen(textInput.tmpstr,"w+");
+		if (file == NULL) return;
+		fwrite(textInput.buffer,sizeof(char),textInput.cur,file);
+		fclose(file);
 	}
-	file = fopen(textInput.tmpstr,"w+");
-	if (file == NULL) return;
-	fwrite(textInput.buffer,sizeof(char),textInput.cur,file);
-	fclose(file);
+	revertSystemState();
 }
 
 void loadFile(){
 	int i = 0;
 	FILE *file = NULL;
-	if (textInput.tmpstr[0] == 0){
-		return;
+	if (textInput.tmpstr[0] != 0){
+		file = fopen(textInput.tmpstr,"r+");
+		if (file == NULL) return;
+		//fwrite(textInput.buffer,sizeof(char),textInput.cur,file);
+		fclose(file);
 	}
-	file = fopen(textInput.tmpstr,"r+");
-	if (file == NULL) return;
-	//fwrite(textInput.buffer,sizeof(char),textInput.cur,file);
-	fclose(file);
-
+	revertSystemState();
 }
 
 BOOL isValid(int input){
@@ -280,7 +301,6 @@ BOOL checkCommand(){
 		loadFile();
 		result = TRUE;
 	}
-	if (result == TRUE)	revertSystemState();
 
 	return result;
 }
@@ -333,7 +353,7 @@ BOOL inputHandler(){
 			doExit();
 			break;
 		default:
-			printw("Input is: %d : %c\n",input,input);
+			//printw("Input is: %d : %c\n",input,input);
 			if (isValid(input)){
 				addchar(input);
 			}
