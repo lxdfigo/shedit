@@ -2,14 +2,14 @@
 #include <ncurses.h>
 
 TextInput textInput;
-SystemStatus shSystem = {0,0,0,0,FALSE,InDefault,InDefault};
+SystemStatus shSystem = {0,0,FALSE,InDefault,InDefault};
 
 void initCurses(){
 	initscr();
 	clear();
 	noecho();
-	//raw();
-	cbreak(); 
+	raw();
+	//cbreak(); 
 	keypad(stdscr,TRUE);
 	refresh();
 	if (!has_colors() || start_color() == ERR){

@@ -1,183 +1,323 @@
 #include "edit.h"
-#include "controller.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <string.h>
 #include <ncurses.h>
 
 
-
 #define KEYNUM     14
-#define TEXTLENSIZE 1024
-const char * tmpfilename = "/tmp/shedit.tmp";
-FILE* tmpFile;
-
 struct KeyWord{
 	int length;
 	char *str;
 }keywords[KEYNUM] = {{2,"if"},{2,"do"},{4,"done"},{5,"while"},{4,"case"},{4,"then"},{4,"else"},{4,"elif"}
 ,{2,"fi"},{4,"esac"},{4,"echo"},{2,"ls"},{4,"more"},{8,"function"}};
 
+Element *creatElement(char input){
+	Element *el = malloc(sizeof(char));
+	el->c = input;
+	el->next = NULL;
+	el->previous = NULL;
+	el->father = NULL;
+	return el;
+}
+Element * appNewElement(Element *element,char input){
+	Element *el = creatElement(input);
+	if (element == NULL){
+		el->father = textInput.head;
+		el->father->head = el;
+	}else{
+		el->previous = element;
+		el->next = element->next;
+		element->next->previous = el;
+		element->next = el;
+		el->father = element->father;
+	}
+	el->father->count++;
+	return el;
+}
+
 Word* createNewWord(){
 	Word *w = malloc(sizeof(Word));
-	w->begin = 0;
-	w->end = 0;
+	w->begin = NULL;
+	w->end = NULL;
 	w->next = NULL;
 	w->previous = NULL;
 	w->type = NORMAL;
+	w->count = 0;
 	return w;
 }
 
-Word *addNewWord(){
+Word* appNewWord(Word *word){
 	Word *w = createNewWord();
-	w->begin = textInput.cur;
-	w->end = w->begin;
-	w->next = NULL;
-	w->previous = textInput.current;
-	w->type = NORMAL;
-	textInput.current->next = w;
-	textInput.current = w;
+	w->next = word->next;
+	w->previous = word;
+	word->next->previous = w;
+	word->next = w;
+
 	return w;
 }
 
-void initEditModule(){
-	tmpFile = fopen(tmpfilename,"rw");
-	textInput.cur = 0;
-	textInput.tmpcur = 0;
-	memset(textInput.tmpstr,0,sizeof(textInput.tmpstr));
-	textInput.printOffset = 0;
-	textInput.length = TEXTLENSIZE;
-	textInput.buffer = malloc(TEXTLENSIZE);
-	textInput.head = createNewWord();
-	textInput.current = textInput.head;
-
+void delElement(Element *element){
+	Word *word = element->father;
+	if (element == word->begin){
+		word->begin = element->next;
+	}
+	element->previous->next = element->next;
+	free(element);
+	element->father->count--;
+	if (element->father->count == 0){
+		delWord(element->father);
+	}
 }
 
-void destroyEditModule(){
-	fclose(tmpFile);
-	free(textInput.buffer);
+void clearWord(Word *word){
+	Element *el = word->begin;
+	while (el != word->end){
+		Element *tmp = el;
+		el = el->next;
+		free(tmp);
+	}
+	word->begin = NULL;
+	free(word);
+}
+
+void delWord(Word *word){
+	if (word->next != NULL)
+		word->next->previous = word->previous;
+	if (word->previous != NULL)
+		word->previous->next = word->next;
+	clearWord(word);
+}
+
+void clearWords(){
 	Word *w = textInput.head;
 	while (w != NULL){
 		Word *tmp = w;
 		w = w->next;
-		free(tmp);
+		clearWord(tmp);
 	}
+	textInput.head = NULL;
+}
+void clearText(){
+	clearWords();
+	textInput.head = createNewWord();
+	textInput.curElement = NULL;
 }
 
-BOOL isSeparate(char input){
-	Word *w = textInput.current;
-	if (input == '\"' || input == '\''){
-		if (w->type != EXPLAIN)
-			return TRUE;
-	}
-	if (input == '\n'){
-		if (w->type != STRING)
-			return TRUE;
-	}
-	if (input == ' ' || input == '\t'){
-		if (w->type != STRING && w->type != EXPLAIN)
-			return TRUE;
-	}
-	if (input == '#'){
-		if (w->type != STRING)
-			return TRUE;
-	}
-	return FALSE;
-}
 
-BOOL isFunction(char *str,int b,int e){
+BOOL isFunction(Word *word){
 	return FALSE;
 }
-BOOL isOperator(char *str,int b,int e){
-	if (b == e - 1 && (
-		str[b] == '*' || 
-		str[b] == '-' ||
-		str[b] == '+' ||
-		str[b] == '=' ||
-		str[b] == '/' ||
-		str[b] == '|' ||
-		str[b] == '&'
+BOOL isOperator(Word *word){
+	Element *el = word->begin;
+	if (el->next == NULL && (
+		el->c == '*' || 
+		el->c == '-' ||
+		el->c == '+' ||
+		el->c == '=' ||
+		el->c == '/' ||
+		el->c == '|' ||
+		el->c == '&'
 		)){
 			return TRUE;
 	}
 	return FALSE;
 }
-BOOL isKeyWord(char *str,int b,int e){
+BOOL isKeyWord(Word *word){
 	int i,j;
 	for(i = 0; i < KEYNUM; ++i){
 		BOOL sign = TRUE;
-		if (e - b == keywords[i].length){
-			for(j = b; j < e; ++j){
-				if (keywords[i].str[j - b] != str[j]){
+		if (word->count == keywords[i].length){
+			Element * el = word->begin;
+			for(j = 0; j < word->count; ++j){
+				if (el == NULL || keywords[i].str[j] != el->c){
 					sign = FALSE;
 					break;
 				}
+				el = el->next;
 			}
 			if (sign == TRUE) return TRUE;
 		}
 	}
 	return FALSE;
 }
-BOOL isString(char *str,int b,int e){
-	if (str[b] == '\"' || str[b] == '\'')
+BOOL isString(Word *word){
+	Element *el = word->begin;
+	if (el->c == '\"')
 		return TRUE;
 	return FALSE;
 }
-BOOL isExplain(char *str,int b,int e){
-	if (str[b] == '#')
+BOOL isStringDot(Word *word){
+	Element *el = word->begin;
+	if (el->c == '\'')
+		return TRUE;
+	return FALSE;
+}
+BOOL isExplain(Word *word){
+	Element *el = word->begin;
+	if (el->c == '#')
+		return TRUE;
+	return FALSE;
+}
+BOOL isSeparate(Word *word){
+	Element *el = word->begin;
+	if (el->c == ' ' || el->c == '\t' || el->c == '\n')
 		return TRUE;
 	return FALSE;
 }
 
+
 void checkWord(Word * word){
-	if (isFunction(textInput.buffer,word->begin,word->end)){
+	if (word->begin == NULL)
+		return;
+
+	if (isFunction(word)){
 		word->type = FUNCTION;
-	}else if (isOperator(textInput.buffer,word->begin,word->end)){
+	}else if (isOperator(word)){
 		word->type = OPERATOR;
-	}else if (isString(textInput.buffer,word->begin,word->end)){
+	}else if (isString(word)){
 		word->type = STRING;
-	}else if (isKeyWord(textInput.buffer,word->begin,word->end)){
+	}else if (isStringDot(word)){
+		word->type = STRING_DOT;
+	}else if (isKeyWord(word)){
 		word->type = KEYWORD;
-	}else if (isExplain(textInput.buffer,word->begin,word->end)){
+	}else if (isExplain(word)){
 		word->type = EXPLAIN;
+	}else if (isSeparate(word)){
+		word->type = SEPARATE;
 	}else{
 		word->type = NORMAL;
 	}
 }
-void checkChar(char input){
-	if (isSeparate(input)){
-		textInput.current = addNewWord();
+
+int checkSeparate(Word *word,char input){
+	switch(word->type){
+		case FUNCTION:
+		case KEYWORD:
+		case OPERATOR:
+		case NORMAL:
+			if (input == '#' || input == '\"' || input == '\''||
+				input == '\n' || input == ' ' || input == '\t'){
+					return 1;
+			}
+			break;
+		case STRING:
+			if (input == '\"'){
+				return 2;
+			}
+			break;
+		case STRING_DOT:
+			if (input == '\''){
+				return 2;
+			}
+			break;
+		case SEPARATE:
+			if (input != '\n' && input != ' ' & input != '\t'){
+				return 1;
+			}
+			break;
+		case EXPLAIN:
+			if (input == '\n'){
+				return 2;
+			}
+			break;
 	}
-	textInput.current->end = textInput.cur;
-	checkWord(textInput.current);
+	return 0;
+}
+
+void linkElementInWord(Element *el,Word *word){
+	if (word->begin == word->end){
+		word->begin = el;
+		word->end = el->next;
+	}else{
+		word->end = el;
+	}
+	word->count++;
+}
+
+Word *rebuildWord(Word *word){
+	Element *el = word->begin;
+
+	Word *head = createNewWord();
+	Word *curWord = head;
+	curWord->begin = el;
+	curWord->end = el->next;
+	curWord->count++;
+
+	el = el->next;
+	while(el != word->end){
+		int sign = checkSeparate(curWord,el->c);
+		switch (sign){
+			case 1:
+				curWord = appNewWord(curWord);
+			case 0:
+				linkElementInWord(el,curWord);
+				break;
+			case 2:
+				linkElementInWord(el,curWord);
+				curWord = appNewWord(curWord);
+				break;
+		}
+		checkWord(curWord);
+		el = el->next;
+	}
+	word->previous->next = head;
+	curWord->next = word->next;
+	word->next->previous = curWord;
+	head->previous = word->previous;
+	free(word);
+	return curWord;
+}
+
+BOOL isCombine(Word *w1,Word*w2){
+	BOOL result = FALSE;
+	switch (w1->type){
+		case FUNCTION:
+		case KEYWORD:
+		case OPERATOR:
+		case NORMAL:
+			if (w2->type != SEPARATE)
+				result = TRUE;
+			break;
+		case STRING:
+			if (w2->type == STRING)
+				result = TRUE;
+			break;
+		case STRING_DOT:
+			if (w2->type == STRING_DOT)
+				result = TRUE;
+			break;
+		case SEPARATE:
+			if (w2->type == SEPARATE)
+				result = TRUE;
+			break;
+		case EXPLAIN:
+			result = TRUE;
+			break;
+	}
+	if (result == TRUE){
+		w1->next = w2->next;
+		if (w2->next != NULL)
+			w2->next->previous = w1;
+		w1->end = w2->end;
+		free(w2);
+	}
+	return result;
+}
+
+void rebuildWords(Word *word){
+	Word *word;
+	do{
+		word = rebuildWord(word);
+	}while (isCombine(word,word->next) == TRUE);
 }
 
 void addCharInBuffer(char input){
-	textInput.buffer[textInput.cur] = input;
-	textInput.cur++;
-	shSystem.textX++;
-	if (input == '\n' || shSystem.textX >= COLS){
-		shSystem.textY++;
-		shSystem.textX = 0;
-	}
-	if (textInput.cur >= textInput.length){
-		char *tmp = malloc(textInput.length + TEXTLENSIZE);
-		memcpy(tmp,textInput.buffer,textInput.length * sizeof(char));
-		free(textInput.buffer);
-		textInput.length += TEXTLENSIZE;
-		textInput.buffer = tmp;
-	}
-	checkChar(input);
+	textInput.curElement = appNewElement(textInput.curElement,input);
+	rebuildWords(textInput.curElement->father);
 }
 
 void addCharInTemp(char input){
-	textInput.tmpstr[textInput.tmpcur] = input;
-	textInput.tmpcur++;
+	textInput.tmpStr[textInput.tmpCur] = input;
+	textInput.tmpCur++;
 }
 
 void addchar(char input){
@@ -190,175 +330,4 @@ void addchar(char input){
 			addCharInBuffer(input);
 			break;
 	}
-}
-
-void doExit(){
-	setSystemState(InQuit);
-	shSystem.isQuit = TRUE;
-}
-
-void doNewFile(){
-
-}
-
-void doSave(){
-	setSystemState(InSave);
-	memset(textInput.tmpstr,0,sizeof(textInput.tmpstr));
-	textInput.tmpcur = 0;
-}
-
-void doLoad(){
-	setSystemState(InLoad);
-	memset(textInput.tmpstr,0,sizeof(textInput.tmpstr));
-	textInput.tmpcur = 0;
-}
-void doEdit(){
-
-}
-void doDebug(){
-
-}
-void doHelp(){
-
-}
-
-void doFile(){
-	switch(shSystem.menuSection){
-		case 0:
-			doNewFile();
-			break;
-		case 1:
-			doLoad();
-			break;
-		case 2:
-			doSave();
-			break;
-		case 3:
-			doExit();
-			break;
-	}
-}
-
-
-
-void doMenu(){
-	switch (shSystem.menuIndex){
-		case 0:
-			doFile();
-			break;
-		case 1:
-			doEdit();
-			break;
-		case 2:
-			doDebug();
-			break;
-		case 3:
-			doHelp();
-			break;
-	}
-}
-
-
-void saveFile(){
-	int i = 0;
-	FILE *file = NULL;
-	if (textInput.tmpstr[0] != 0){
-		file = fopen(textInput.tmpstr,"w+");
-		if (file == NULL) return;
-		fwrite(textInput.buffer,sizeof(char),textInput.cur,file);
-		fclose(file);
-	}
-	revertSystemState();
-}
-
-void loadFile(){
-	int i = 0;
-	FILE *file = NULL;
-	if (textInput.tmpstr[0] != 0){
-		file = fopen(textInput.tmpstr,"r+");
-		if (file == NULL) return;
-		//fwrite(textInput.buffer,sizeof(char),textInput.cur,file);
-		fclose(file);
-	}
-	revertSystemState();
-}
-
-BOOL isValid(int input){
-	if (input == '\n' || input == ' ' || (input >= 32 && input <= 126)){
-		return TRUE;
-	}
-	return FALSE;
-}
-BOOL checkCommand(){
-	BOOL result = FALSE;
-	if (shSystem.state == InMenu){
-		doMenu();
-		result = TRUE;
-	}else if (shSystem.state == InSave){
-		saveFile();
-		result = TRUE;
-	}else if (shSystem.state == InLoad){
-		loadFile();
-		result = TRUE;
-	}
-
-	return result;
-}
-
-BOOL inputHandler(){
-	int input = getch();
-
-	switch(input){
-		case KEY_F(1):
-			if (shSystem.state == InMenu){
-				revertSystemState();
-			}else{
-				setSystemState(InMenu);
-			}
-			break;
-		case KEY_UP:
-			if (shSystem.state == InMenu){
-				shSystem.menuSection--;
-			}else if (shSystem.state == InDefault){
-				shSystem.textY--;
-			}
-			break;
-		case KEY_DOWN:
-			if (shSystem.state == InMenu){
-				shSystem.menuSection++;
-			}else if (shSystem.state == InDefault){
-				shSystem.textY++;
-			}
-			break;
-		case KEY_LEFT:
-			if (shSystem.state == InMenu){
-				shSystem.menuIndex--;
-			}else if (shSystem.state == InDefault){
-				shSystem.textX--;
-			}
-			break;
-		case KEY_RIGHT:
-			if (shSystem.state == InMenu){
-				shSystem.menuIndex++;
-			}else if (shSystem.state == InDefault){
-				shSystem.textX++;
-			}
-			break;
-		case '\n'://KEY_ENTER:
-			if (!checkCommand()){
-				addchar(input);
-			}
-			break;
-		case 27://KEY_EXIT:
-			doExit();
-			break;
-		default:
-			//printw("Input is: %d : %c\n",input,input);
-			if (isValid(input)){
-				addchar(input);
-			}
-			break;
-	}
-
-	return shSystem.isQuit;
 }

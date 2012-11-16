@@ -75,6 +75,7 @@ typedef struct{
 
 WINDOW *inputWin;
 int erx,erex,ery,erey,mrx,mrex,mry,mrey,srx,srex,sry,srey;
+int curX,curY;
 ColorSultion colorsln;
 CMenu menu = {80,1,8,4,{
 	{8,4,"FILE",  {
@@ -84,8 +85,8 @@ CMenu menu = {80,1,8,4,{
 			"Quit"}},
 		{8,5,"EDIT",{
 			"Undo",
-				"Copy",
 				"Cut",
+				"Copy",
 				"Paste",
 				"Search"}},
 			{20,3,"DEBUG", {
@@ -160,7 +161,8 @@ void resetView(){
 	drawStatusFrame();
 	drawStatusRoom();
 	drawEditRoom();
-	setCurser(shSystem.textX,shSystem.textY);
+	curX = 0;curY = 0;
+	setCurser(curX,curY);
 }
 
 void gotoxy(int x,int y){
@@ -206,9 +208,8 @@ void drawNoTopWindow(int x,int y,int ex,int ey,int tc){
 }
 void drawWindow(int x,int y,int ex,int ey,int tc){
 	int i;
-	drawNoTopWindow(x,y,ex,ey,tc);
-	printBg(x,y,ex,ey,tc);
 
+	drawNoTopWindow(x,y,ex,ey,tc);
 	for(i = x; i <= ex; ++i){
 		gotoxy(i, y);
 		printw("-");
@@ -308,8 +309,23 @@ void drawWord(Word *w){
 	}else if (w->type == EXPLAIN){
 		setcolor(colorsln.er_e_tc);
 	}
-	for(i = w->begin; i < w->end; ++i){
-		printw("%c",textInput.buffer[i]);
+	Element *el = w->begin;
+	while(el != w->end){
+		printw("%c",el->c);
+		el = el->next;
+	}
+}
+
+void checkCursor(Word *w){
+	if (w == textInput.curElement->father){
+		Element *el = w->begin;
+		while(el != w->end){
+			if (el == textInput.curElement){
+				getyx(stdscr,curY,curX);
+				break;
+			}
+			el = el->next;
+		}
 	}
 }
 
@@ -319,12 +335,14 @@ void drawEditRoom(){
 	Word *w = textInput.head;
 	while(w != NULL){
 		drawWord(w);
+		checkCursor(w);
 		w = w->next;
 	}
 }
 
 void drawStatusRoom(){
-
+	setcolor(colorsln.sr_tc_1);
+	mvprintw(sry,srx,"Menu - F1");
 }
 
 void storeWindow(int x,int y,int wid,int hei){
@@ -351,24 +369,48 @@ void updateMenu(){
 
 }
 
-void drawSaveDialog(){
-	int x,y,w,h;
-	w = 40;
-	h = 10;
+void drawInputDialog(char *str,int len,int w,int h){
+	int x,y,ew,i;
+	x = (COLS - w) / 2;
+	y = (LINES - h) / 2 - 1;
+	ew = 30;
+
+	storeWindow(x,y,w+1,h+1);
+	drawWindow(x,y,w+x,h+y,colorsln.mr_tc_1);
+
+	setcolor(colorsln.mr_tc_2);
+	mvprintw(y + 2,x + (w - 4)/2,"%s",str);
+
+	x += (w - ew)/2; y += h/2 - 1;
+	printBg(x, y, x + ew, y,colorsln.er_tc);
+
+	i = textInput.tmpCur - ew + 1;
+	i = i > 0 ? i : 0;
+	mvprintw(y,x,"%s",textInput.tmpStr + i);
+}
+
+void drawMessageDialog(char *str,int len,int w,int h){
+	int x,y;
 	x = (COLS - w) / 2;
 	y = (LINES - h) / 2 - 1;
 
-	storeWindow(x,y,w,h);
+	storeWindow(x,y,w+1,h+1);
 	drawWindow(x,y,w+x,h+y,colorsln.mr_tc_1);
 
-	x += 5; y += h/2 - 1;
-	printBg(x, y, x + w - 10, y,colorsln.er_tc);
-	mvprintw(y,x,"%s",textInput.tmpstr);
+	x += (w - len)/2; y += h/2 - 1;
+	mvprintw(y,x,"%s",str);
+}
+void drawSaveDialog(){
+	drawInputDialog("Save",4,40,10);
 }
 
 void drawLoadDialog(){
-
+	drawInputDialog("Load",4,40,10);
 }
+void drawAboutDialog(){
+	drawMessageDialog("Hello World!",20,30,10);
+}
+
 void updateView(){
 	if (inputWin != NULL){
 		overwrite(inputWin, stdscr);
@@ -391,6 +433,11 @@ void updateView(){
 			drawEditRoom();
 			drawStatusRoom();
 			break;
+		case InAbout:
+			curs_set(0);
+			drawAboutDialog();
+			break;
 	}
+	setCurser(curX,curY);
 	refresh();
 }

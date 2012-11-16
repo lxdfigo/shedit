@@ -12,14 +12,13 @@ enum SystemState{
 	InQuit,
 	InLoad,
 	InSave,
+	InAbout,
 	InDefault
 };
 
 typedef struct {
 	int menuIndex;
 	int menuSection;
-	int textX;
-	int textY;
 	BOOL isQuit;
 	enum SystemState lastState;
 	enum SystemState state;
@@ -31,29 +30,35 @@ enum WordType{
 	OPERATOR,
 	NORMAL,
 	STRING,
-	STRING2,
+	STRING_DOT,
 	SELECTED,
+	SEPARATE,
 	EXPLAIN
 };
 
-struct _Word{
+struct _Word;
+
+typedef struct _Element{
+	char c;
+	struct _Element *next;
+	struct _Element *previous;
+	struct _Word *father;
+}Element;
+
+typedef struct _Word{
 	enum WordType type;
-	long begin,end;
+	Element *begin;
+	Element *end;
+	int count;
 	struct _Word *next;
 	struct _Word *previous;
-};
-
-typedef struct _Word Word;
+}Word;
 
 typedef struct{
-	long cur;
-	long length;
-	long printOffset;
-	char tmpstr[1024];
-	short tmpcur;
-	char *buffer;
+	char tmpStr[1024];
+	short tmpCur;
 	Word *head;
-	Word *current;
+	Element *curElement;
 }TextInput; 
 
 extern TextInput textInput;
