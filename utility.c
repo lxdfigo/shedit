@@ -1,3 +1,28 @@
+//
+//  utility.c
+//
+//  Created by LIU XiaoDan on 7/11/2012.
+//
+
+/***********************************************************************************
+*
+* All code (C) LIU XiaoDan (lxdfigo@gmail.com), 2012
+*
+*    This program is free software: you can redistribute it and/or modify
+*    it under the terms of the GNU General Public License as published by
+*    the Free Software Foundation, either version 3 of the License, or
+*    (at your option) any later version.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*
+*    GNU General Public License for more details.
+*
+*    You should have received a copy of the GNU General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*
+************************************************************************************/
 #include "edit.h"
 #include "controller.h"
 
@@ -136,20 +161,20 @@ BOOL isValid(int input){
 	return FALSE;
 }
 void checkCommand(){
-	if (shSystem.state == InMenu){
+	if (isSystemState(InMenu)){
 		doMenu();
-	}else if (shSystem.state == InSave){
+	}else if (isSystemState(InSave)){
 		saveFile();
-	}else if (shSystem.state == InLoad){
+	}else if (isSystemState(InLoad)){
 		loadFile();
-	}else if (shSystem.state == InAbout || shSystem.state == InManual){
+	}else if (isSystemState(InAbout) || isSystemState(InManual)){
 		setSystemState(InDefault);
 	}else{
 		addchar('\n');
 	}
 }
 void checkMenu(){
-	if (shSystem.state == InMenu){
+	if (isSystemState(InMenu)){
 		revertSystemState();
 	}else{
 		setSystemState(InMenu);
@@ -188,7 +213,7 @@ void deleteSelectedWords(){
 }
 
 void doDelete(){
-	if (shSystem.state == InDefault){
+	if (isSystemState(InDefault)){
 		Element *el = textInput.curElement;
 		if (el == NULL){ 
 			el = textInput.headWord->begin;
@@ -196,20 +221,20 @@ void doDelete(){
 			el = el->next;
 		}
 		deleteElementInWord(el);
-	}else if(shSystem.state == InSelect){
+	}else if(isSystemState(InSelect)){
 		deleteSelectedWords();
 		setSystemState(InDefault);
 	}
 }
 
 void doBackspace(){
-	if (shSystem.state == InDefault){
+	if (isSystemState(InDefault)){
 		Element *el = textInput.curElement;
 		if (el != NULL){
 			textInput.curElement = el->previous;
 			deleteElementInWord(el);
 		}
-	}else if(shSystem.state == InSelect){
+	}else if(isSystemState(InSelect)){
 		deleteSelectedWords();
 		setSystemState(InDefault);
 	}
@@ -247,7 +272,7 @@ BOOL isElementAheadElement(Element *head, Element *behind){
 }
 
 void getSelectElements(){
-	if (shSystem.state == InSelect){
+	if (isSystemState(InSelect)){
 		eraseSelected(textInput.selected_begin,textInput.selected_end);
 		Element *el= textInput.curElement;
 		if (isElementAheadElement(textInput.selected_center,el)){
@@ -271,9 +296,9 @@ void getSelectElements(){
 
 
 void moveUp(){
-	if (shSystem.state == InMenu){
+	if (isSystemState(InMenu){
 		shSystem.menuSection--;
-	}else if (shSystem.state == InDefault || shSystem.state == InSelect){
+	}else if (isSystemState(InDefault) || isSystemState(InSelect)){
 		int n1 = 0, n2 = 0, i = 0, n = 0;
 		if (textInput.curElement == NULL) return;
 		Element *el = findLineHead(textInput.curElement,&n1);
@@ -296,9 +321,9 @@ void moveUp(){
 }
 
 void moveDown(){
-	if (shSystem.state == InMenu){
+	if (isSystemState(InMenu)){
 		shSystem.menuSection++;
-	}else if (shSystem.state == InDefault || shSystem.state == InSelect){
+	}else if (isSystemState(InDefault) || isSystemState(InSelect)){
 		int i = 0, n = 0;
 		Element *el = textInput.curElement;
 		el = findLineEnd(el,&n);
@@ -315,9 +340,9 @@ void moveDown(){
 }
 
 void moveLeft(){
-	if (shSystem.state == InMenu){
+	if (isSystemState(InMenu)){
 		shSystem.menuIndex--;
-	}else if (shSystem.state == InDefault || shSystem.state == InSelect){
+	}else if (isSystemState(InDefault) || isSystemState(InSelect)){
 		if (textInput.curElement != NULL){
 			textInput.curElement = textInput.curElement->previous;
 		}
@@ -326,9 +351,9 @@ void moveLeft(){
 }
 
 void moveRight(){
-	if (shSystem.state == InMenu){
+	if (isSystemState(InMenu)){
 		shSystem.menuIndex++;
-	}else if (shSystem.state == InDefault){
+	}else if (isSystemState(InDefault) || isSystemState(InSelect)){
 	  if (textInput.curElement == NULL ){
 			textInput.curElement = textInput.headWord->begin;
 	  }else if (textInput.curElement->next != NULL){
@@ -339,7 +364,7 @@ void moveRight(){
 }
 
 void doPageUp(){
-	if (shSystem.state != InDefault) return;
+	if (!isSystemState(InDefault)) return;
 	int i;
 	int upline = screen.erey - screen.ery - 4;
 	for(i = 0; i < upline; ++i){
@@ -349,7 +374,7 @@ void doPageUp(){
 }
 
 void doPageDown(){
-	if (shSystem.state != InDefault) return;
+	if (!isSystemState(InDefault)) return;
 	int i;
 	int upline = screen.erey - screen.ery - 4;
 	for(i = 0; i < upline; ++i){
@@ -359,7 +384,7 @@ void doPageDown(){
 }
 
 void doSelect(){
-	if (shSystem.state == InDefault){
+	if (isSystemState(InDefault)){
 		eraseSelected(textInput.selected_begin,textInput.selected_end);
 		setSystemState(InSelect);
 		textInput.selected_center = textInput.curElement;
@@ -400,7 +425,7 @@ BOOL inputHandler(){
 			checkCommand();
 			break;
 		case KEY_EXIT:
-			if (shSystem.state != InDefault){
+			if (!isSystemState(InDefault)){
 				setSystemState(InDefault);
 			}
 			break;
