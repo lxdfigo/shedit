@@ -1,13 +1,5 @@
 #include "ui.h"
 #include "controller.h"
-#include <stdio.h>
-#include <stdlib.h> 
-#include <unistd.h> 
-#include <sys/ioctl.h> 
-#include <termios.h>  
-#include <unistd.h>  
-#include <errno.h>  
-#include <ncurses.h>
 
 #define ECHOFLAGS (ECHO | ECHOE | ECHOK | ECHONL)  
 
@@ -74,8 +66,6 @@ typedef struct{
 }Point;
 
 WINDOW *inputWin;
-int erx,erex,ery,erey,mrx,mrex,mry,mrey,srx,srex,sry,srey;
-int curX,curY;
 ColorSultion colorsln;
 CMenu menu = {80,1,8,4,{
 	{8,4,"FILE",  {
@@ -83,17 +73,18 @@ CMenu menu = {80,1,8,4,{
 			"Load",
 			"Save",
 			"Quit"}},
-		{8,5,"EDIT",{
-			"Undo",
+		{8,4,"EDIT",{
+			//"Undo",
 				"Cut",
 				"Copy",
 				"Paste",
 				"Search"}},
 			{20,3,"DEBUG", {
 				"Run",
-					"Set Breakpoint",
-					"Del Breakpoint"}},
-				{8,1,"HELP",{
+					"Step",
+					"Set Breakpoint"},
+				{8,2,"HELP",{
+					"Manual",
 					"About"}}
 }
 };
@@ -125,7 +116,7 @@ void initColorSln(ColorSultion *csln){
 	csln->er_o_ktc = initnum;  
 	init_pair(++initnum, COLOR_BLUE, COLOR_BLACK);
 	csln->er_v_ktc = initnum;   
-	init_pair(++initnum, COLOR_BLACK, COLOR_BLACK);
+	init_pair(++initnum, COLOR_CYAN, COLOR_BLACK);
 	csln->er_e_tc = initnum;     
 	init_pair(++initnum, COLOR_MAGENTA, COLOR_BLACK);
 	csln->er_c_tc_1 = initnum;   
@@ -146,6 +137,23 @@ void initColorSln(ColorSultion *csln){
 
 void initUIModule(){
 	initColorSln(&colorsln);
+
+	screen.width = COLS;
+	screen.height = LINES;
+	screen.mrx = 0;
+	screen.mry = 0;
+	screen.mrex = screen.width - 1;
+	screen.mrey = screen.mry;
+	screen.erx = 0;
+	screen.ery = screen.mrey + 1;
+	screen.erex = screen.width-1;
+	screen.erey = screen.height-2;
+	screen.srx = 0;
+	screen.sry = screen.height - 1;
+	screen.srex = screen.width - 1;
+	screen.srey = screen.sry;
+	screen.curX = screen.erx;
+	screen.curY = screen.ery+1;
 }
 
 void destroyUIModule(){
@@ -161,8 +169,9 @@ void resetView(){
 	drawStatusFrame();
 	drawStatusRoom();
 	drawEditRoom();
-	curX = 0;curY = 0;
-	setCurser(curX,curY);
+	setCurser(screen.curX,screen.curY);
+	curs_set(2);
+	refresh();
 }
 
 void gotoxy(int x,int y){
@@ -221,7 +230,7 @@ void drawMenuList(int index,int selSec){
 	int begin = index * menu.itemWidth;
 	int bg,tc1,tc2;
 
-	drawNoTopWindow(begin,mrey + 1,begin + menu.items[index].width,mrey + 1 + menu.items[index].num,
+	drawNoTopWindow(begin,screen.mrey + 1,begin + menu.items[index].width,screen.mrey + 1 + menu.items[index].num,
 		colorsln.mr_tc_1);
 
 	for(i = 0; i < menu.items[index].num; ++i){
@@ -230,119 +239,131 @@ void drawMenuList(int index,int selSec){
 		}else{
 			tc1 = colorsln.mr_tc_1; tc2 = colorsln.mr_tc_2;
 		}
-		printBg(begin + 1,mrey + 1 + i,begin + menu.items[index].width - 1,mrey + 1 + i,tc1);
+		printBg(begin + 1,screen.mrey + 1 + i,begin + menu.items[index].width - 1,screen.mrey + 1 + i,tc1);
 
-		drawItem(begin + 2, mrey + 1 + i,menu.items[index].section[i],tc2,tc1);
+		drawItem(begin + 2, screen.mrey + 1 + i,menu.items[index].section[i],tc2,tc1);
 	}
 }
 
 void drawSelectMenu(int index,int selSec){
-	drawItem(2 + mrx + index * menu.itemWidth,mry,
+	drawItem(2 + screen.mrx + index * menu.itemWidth,screen.mry,
 		menu.items[index].name,colorsln.mr_s_tc_2,colorsln.mr_s_tc_1);
 	drawMenuList(index,selSec);
 }
 
 void drawMenu(){
 	int i = 0;
-	mrx = 0;
-	mry = 0;
-	mrex = COLS - 1;
-	mrey = mry;
 
-	printBg(mrx,mry,mrex,mrey,colorsln.mr_tc_1);
+	printBg(screen.mrx,screen.mry,screen.mrex,screen.mrey,colorsln.mr_tc_1);
 
 	for(i = 0; i < menu.num; ++i){
-		drawItem(MENUAHEAD + mrx + i * menu.itemWidth,mry,
+		drawItem(MENUAHEAD + screen.mrx + i * menu.itemWidth,screen.mry,
 			menu.items[i].name,colorsln.mr_tc_2,colorsln.mr_tc_1);
 	}
 }
 
 void drawEditFrame(){
 	int i;
-	erx = 0;
-	ery = mrey + 1;
-	erex = COLS-1;
-	erey = LINES-2;
 
-	printBg(erx,ery,erex,erey,colorsln.er_tc);
+	printBg(screen.erx,screen.ery,screen.erex,screen.erey,colorsln.er_tc);
 
 	setcolor(colorsln.er_tc);
-	for(i = erx; i < erex; ++i){
-		gotoxy(i,ery);
+	for(i = screen.erx; i < screen.erex; ++i){
+		gotoxy(i,screen.ery);
 		printw("=");
 		//printw("%c",205);
 	}
-	for(i = erx; i < erex; ++i){
-		gotoxy(i,erey);
+	for(i = screen.erx; i < screen.erex; ++i){
+		gotoxy(i,screen.erey);
 		printw("-");
 		//printw("%c",196);
 	}
-	gotoxy((erex-erx-6)/2 + erx,ery);
+	gotoxy((screen.erex-screen.erx-6)/2 + screen.erx,screen.ery);
 	printw("shedit");
 }
 void drawStatusFrame(){
-	srx = 0;
-	sry = LINES - 1;
-	srex = COLS - 1;
-	srey = sry;
 
-	printBg(srx,sry,srex,srey,colorsln.sr_tc_1);
+	printBg(screen.srx,screen.sry,screen.srex,screen.srey,colorsln.sr_tc_1);
 
 }
 
 void setCurser(int x,int y){
-	gotoxy(erx + x,ery + 1 + y);
+	gotoxy(x,y);
 }
 
-void drawWord(Word *w){
-	int i = 0;
-	if (w->type == NORMAL){
-		setcolor(colorsln.er_tc);
-	}else if (w->type == FUNCTION){
-		setcolor(colorsln.er_f_ktc);
-	}else if (w->type == OPERATOR){
-		setcolor(colorsln.er_o_ktc);
-	}else if (w->type == KEYWORD){
-		setcolor(colorsln.er_v_ktc);
-	}else if (w->type == STRING){
-		setcolor(colorsln.er_c_tc_1);
-	}else if (w->type == EXPLAIN){
-		setcolor(colorsln.er_e_tc);
+void drawElement(Element *el){
+	if (el == NULL || el->father == NULL){
+		printw("There is no father of element or no element!\n");
+		return;
 	}
-	Element *el = w->begin;
-	while(el != w->end){
-		printw("%c",el->c);
+	int i = 0;
+
+	switch(el->father->type){
+		case NORMAL:
+		case SEPARATE:
+		case NEWLINE:
+			setcolor(colorsln.er_tc);
+			break;
+		case FUNCTION:
+			setcolor(colorsln.er_f_ktc);
+			break;
+		case OPERATOR:
+			setcolor(colorsln.er_o_ktc);
+			break;
+		case STRING:
+			setcolor(colorsln.er_c_tc_1);
+			break;
+		case STRING_DOT:
+			setcolor(colorsln.er_c_tc_2);
+			break;
+		case EXPLAIN:
+			setcolor(colorsln.er_e_tc);
+			break;
+		case KEYWORD:
+			setcolor(colorsln.er_v_ktc);
+			break;
+	}
+	if (el->isSelected == TRUE)
+		setcolor(colorsln.er_s_tc_1);
+
+	printw("%c",el->c);
+	if (el == textInput.curElement){
+		getyx(stdscr,screen.curY,screen.curX);
+	}
+}
+
+
+void drawEditRoom(){
+	drawEditFrame();
+      
+	screen.curY = screen.ery + 1;
+	screen.curX = screen.erx;
+	gotoxy(screen.erx,screen.ery+1);
+	setcolor(colorsln.er_tc);
+	Element *el = textInput.screenBeginElement;
+	while(el != NULL){
+	  	drawElement(el);
 		el = el->next;
 	}
 }
 
-void checkCursor(Word *w){
-	if (w == textInput.curElement->father){
-		Element *el = w->begin;
-		while(el != w->end){
-			if (el == textInput.curElement){
-				getyx(stdscr,curY,curX);
-				break;
-			}
-			el = el->next;
-		}
-	}
-}
-
-void drawEditRoom(){
-	gotoxy(erx,ery+1);
-	setcolor(colorsln.er_tc);
-	Word *w = textInput.head;
-	while(w != NULL){
-		drawWord(w);
-		checkCursor(w);
-		w = w->next;
-	}
-}
-
 void drawStatusRoom(){
+	drawStatusFrame();
 	setcolor(colorsln.sr_tc_1);
-	mvprintw(sry,srx,"Menu - F1");
+	gotoxy(screen.sry,screen.srx + 1);
+	printw("Menu - F1");
+	setcolor(colorsln.sr_tc_2);
+	gotoxy(screen.sry,screen.srex * 0.6);
+	printw("Ln");
+	setcolor(colorsln.sr_tc_3);
+	gotoxy(screen.sry,screen.srex * 0.6 + 3);
+	printw("%d",textInput.curLn);
+	setcolor(colorsln.sr_tc_2);
+	gotoxy(screen.sry,screen.srex * 0.7);
+	printw("Col ");
+	setcolor(colorsln.sr_tc_3);
+	gotoxy(screen.sry,screen.srex * 0.7 + 4);
+	printw("%d",textInput.curCol);
 }
 
 void storeWindow(int x,int y,int wid,int hei){
@@ -363,7 +384,7 @@ void updateMenu(){
 		menu.items[shSystem.menuIndex].num - 1 : shSystem.menuSection;
 
 	//storeWindow(shSystem.menuIndex * menu.width,0,5,12);
-	storeWindow(0,0,COLS,20);
+	storeWindow(0,0,screen.width,20);
 
 	drawSelectMenu(shSystem.menuIndex,shSystem.menuSection);
 
@@ -371,44 +392,54 @@ void updateMenu(){
 
 void drawInputDialog(char *str,int len,int w,int h){
 	int x,y,ew,i;
-	x = (COLS - w) / 2;
-	y = (LINES - h) / 2 - 1;
-	ew = 30;
+	x = (screen.width - w) / 2;
+	y = (screen.height - h) / 2 - 1;
+	ew = w * 0.618;
 
 	storeWindow(x,y,w+1,h+1);
 	drawWindow(x,y,w+x,h+y,colorsln.mr_tc_1);
 
-	setcolor(colorsln.mr_tc_2);
-	mvprintw(y + 2,x + (w - 4)/2,"%s",str);
+	setcolor(colorsln.mr_tc_1);
+	mvprintw(y + 1,x + (w - len)/2,"%s",str);
 
-	x += (w - ew)/2; y += h/2 - 1;
+	x += (w - ew)/2;
+	y += h/2;
+	mvprintw(y, x - 5,"Path:");
 	printBg(x, y, x + ew, y,colorsln.er_tc);
 
 	i = textInput.tmpCur - ew + 1;
 	i = i > 0 ? i : 0;
 	mvprintw(y,x,"%s",textInput.tmpStr + i);
+	getyx(stdscr,screen.curY,screen.curX);
 }
 
-void drawMessageDialog(char *str,int len,int w,int h){
+void drawMessageDialog(char *title,int tlen,char *str,int len,int w,int h){
 	int x,y;
-	x = (COLS - w) / 2;
-	y = (LINES - h) / 2 - 1;
+	x = (screen.width - w) / 2;
+	y = (screen.height - h) / 2 - 1;
 
 	storeWindow(x,y,w+1,h+1);
 	drawWindow(x,y,w+x,h+y,colorsln.mr_tc_1);
 
-	x += (w - len)/2; y += h/2 - 1;
-	mvprintw(y,x,"%s",str);
+	setcolor(colorsln.mr_tc_1);
+	mvprintw(y + 1,x + (w - tlen)/2,"%s",title);
+
+	mvprintw(y + 3,x + len,"%s",str);
 }
 void drawSaveDialog(){
-	drawInputDialog("Save",4,40,10);
+	drawInputDialog("Save",4,35,7);
 }
 
 void drawLoadDialog(){
-	drawInputDialog("Load",4,40,10);
+	drawInputDialog("Load",4,35,7);
+}
+void drawManualDialog(){
+	drawMessageDialog("Manual",6,
+		"Menu - F1\nRun - F5\nStep Over - F10\nSet Breakpoint - F9\nSelect - Ctrl+L\nSelectAll - Ctrl+A\nCut - Ctrl+X\nCopy - Ctrl+C\nPaste - Ctrl+V\nSave - Ctrl+S",3,35,15);
 }
 void drawAboutDialog(){
-	drawMessageDialog("Hello World!",20,30,10);
+	drawMessageDialog("Author",6,
+		"lxdfigo@gmail.com",7,25,5);
 }
 
 void updateView(){
@@ -430,6 +461,7 @@ void updateView(){
 			drawLoadDialog();
 			break;
 		case InDefault:
+		case InSelect:
 			drawEditRoom();
 			drawStatusRoom();
 			break;
@@ -437,7 +469,11 @@ void updateView(){
 			curs_set(0);
 			drawAboutDialog();
 			break;
+		case InManual:
+			curs_set(0);
+			drawManualDialog();
+			break;
 	}
-	setCurser(curX,curY);
+	setCurser(screen.curX,screen.curY);
 	refresh();
 }

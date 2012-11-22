@@ -1,6 +1,6 @@
 #Makefile of the shedit
 
-objects = edit.o ui.o controller.o menufuncs.o
+objects = edit.o ui.o controller.o menufuncs.o utility.o
 CC = cc
 
 shedit : $(objects)

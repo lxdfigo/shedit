@@ -9,12 +9,26 @@ void destroyEditModule();
 
 void doMenu();
 
-void clearText();
+BOOL delWord(Word *word);
+BOOL clearText();
 void addchar(char input);
-void clearWords();
-void delElement(Element *element);
-Element *creatElement(char input);
+BOOL clearElements();
+int delElement(Element *element);
+Element *createElement(char input);
+Element *copyElement(Element *input);
 Word* createNewWord();
 void rebuildWords(Word *w);
 
+void eraseSelected(Element *begin,Element *end);
+void loadFileinBuffer(char *filename);
+
+void doCut();
+void doCopy();
+void doPaste();
+void doSearch();
+void doDelete();
+
+void doRun();
+void doStep();
+void doSetBreakpoint();
 #endif

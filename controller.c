@@ -1,20 +1,30 @@
 #include "controller.h"
-#include <ncurses.h>
 
+Screen screen;
 TextInput textInput;
-SystemStatus shSystem = {0,0,FALSE,InDefault,InDefault};
+SystemStatus shSystem;
+
+void initSystem(){
+	shSystem.isQuit = FALSE;
+	shSystem.lastState = InDefault;
+	shSystem.state = InDefault;
+	shSystem.menuIndex = 0;
+	shSystem.menuSection = 0;
+	memset(shSystem.fileName,0,sizeof(shSystem.fileName));
+}
 
 void initCurses(){
 	initscr();
 	clear();
 	noecho();
-	raw();
-	//cbreak(); 
+	//raw();
+	cbreak(); 
 	keypad(stdscr,TRUE);
 	refresh();
 	if (!has_colors() || start_color() == ERR){
 		printw("Terminal don't support colors!\n");
 	}
+	initSystem();
 }
 void destroyCurses(){
 	clrtoeol();

@@ -1,35 +1,58 @@
 #include "edit.h"
-#include <string.h>
-#include <ncurses.h>
 
 
 #define KEYNUM     14
+#define OPERATORNUM 14
 struct KeyWord{
 	int length;
 	char *str;
 }keywords[KEYNUM] = {{2,"if"},{2,"do"},{4,"done"},{5,"while"},{4,"case"},{4,"then"},{4,"else"},{4,"elif"}
 ,{2,"fi"},{4,"esac"},{4,"echo"},{2,"ls"},{4,"more"},{8,"function"}};
 
-Element *creatElement(char input){
-	Element *el = malloc(sizeof(char));
+char operators[OPERATORNUM] = {'+','/','-','*','=','(',')','<','>','%','^','!','&','|'};
+
+Element *createElement(char input){
+	Element *el = malloc(sizeof(Element));
 	el->c = input;
 	el->next = NULL;
 	el->previous = NULL;
 	el->father = NULL;
+	el->isSelected = FALSE;
+	return el;
+}
+Element *copyElement(Element *input){
+	if (input == NULL) return NULL;
+	Element *el = createElement(input->c);
+	el->next = input->next;
+	el->previous = input->previous;
+	el->father = input->father;
+	el->isSelected = input->isSelected;
 	return el;
 }
 Element * appNewElement(Element *element,char input){
-	Element *el = creatElement(input);
+	Element *el = createElement(input);
 	if (element == NULL){
-		el->father = textInput.head;
-		el->father->head = el;
+		Word *word = textInput.headWord;
+		textInput.headWord = createNewWord();
+		el->father = textInput.headWord;
+		el->father->begin = el;
+		if (word != NULL){
+			word->previous = textInput.headWord;
+			textInput.headWord->next = word;
+			el->next = word->begin;
+			if (word->begin != NULL)
+				word->begin->previous = el;
+		}
+		el->father->end = el->next;
 	}else{
 		el->previous = element;
 		el->next = element->next;
-		element->next->previous = el;
+		if (element->next != NULL)
+			element->next->previous = el;
 		element->next = el;
 		el->father = element->father;
 	}
+	el->father->type = NORMAL;
 	el->father->count++;
 	return el;
 }
@@ -40,7 +63,7 @@ Word* createNewWord(){
 	w->end = NULL;
 	w->next = NULL;
 	w->previous = NULL;
-	w->type = NORMAL;
+	w->type = EMPTY;
 	w->count = 0;
 	return w;
 }
@@ -49,74 +72,144 @@ Word* appNewWord(Word *word){
 	Word *w = createNewWord();
 	w->next = word->next;
 	w->previous = word;
-	word->next->previous = w;
+	if (word->next != NULL)
+		word->next->previous = w;
 	word->next = w;
 
 	return w;
 }
 
-void delElement(Element *element){
-	Word *word = element->father;
-	if (element == word->begin){
-		word->begin = element->next;
+BOOL isEmptyWord(Word *word){
+	if (word == NULL) return TRUE;
+	if (word->count <= 0 || word->begin == word->end) {
+		word->type = EMPTY;
+		return TRUE;
 	}
-	element->previous->next = element->next;
-	free(element);
-	element->father->count--;
-	if (element->father->count == 0){
-		delWord(element->father);
-	}
+	return FALSE;
 }
 
-void clearWord(Word *word){
-	Element *el = word->begin;
-	while (el != word->end){
-		Element *tmp = el;
-		el = el->next;
-		free(tmp);
+BOOL replaceWord(Word *word,Word *headWord,Word * endWord){
+	if (word == NULL || headWord == NULL || endWord == NULL) return FALSE;
+	if (word->previous != NULL){
+		word->previous->next = headWord;
 	}
-	word->begin = NULL;
+	headWord->previous = word->previous;
+
+	if (word->next != NULL)
+		word->next->previous = endWord;
+	endWord->next = word->next;
+
+	if (textInput.headWord == word){
+		textInput.headWord = headWord;
+	}
+
 	free(word);
+	return TRUE;
 }
 
-void delWord(Word *word){
+Word* combineWords(Word *w1,Word* w2){
+	if (w1 == NULL) return w2;
+	if (w2 == NULL) return w1;
+
+	Element *el = w2->begin;
+	while (el != w2->end){
+		el->father = w1;
+		el = el->next;
+	}
+	w1->end = w2->end;
+	w1->count += w2->count;
+
+	if (w2->next != NULL)
+		w2->next->previous = w1;
+	w1->next = w2->next;
+
+	if (w1->begin == w1->end)
+		w1->type = EMPTY;
+	else
+		w1->type = NORMAL;
+	free(w2);
+	return w1;
+}
+
+BOOL delWord(Word *word){
+	if (word == NULL) return FALSE;
 	if (word->next != NULL)
 		word->next->previous = word->previous;
 	if (word->previous != NULL)
 		word->previous->next = word->next;
-	clearWord(word);
-}
 
-void clearWords(){
-	Word *w = textInput.head;
-	while (w != NULL){
-		Word *tmp = w;
-		w = w->next;
-		clearWord(tmp);
+	if (textInput.headWord == word){
+		textInput.headWord = word->next;
 	}
-	textInput.head = NULL;
-}
-void clearText(){
-	clearWords();
-	textInput.head = createNewWord();
-	textInput.curElement = NULL;
+	free(word);
+	return TRUE;
 }
 
+int delElement(Element *element){
+	if (element == NULL) return;
+	Word *word = element->father;
+	if (word == NULL){
+		printw("There is no father of Element!\n");
+		return;
+	}
+	if (element == word->begin){
+		word->begin = element->next;
+	}
+	if (element->previous != NULL)
+		element->previous->next = element->next;
+	if (element->next != NULL)
+		element->next->previous = element->previous;
+
+	free(element);
+	word->count--;
+	if (isEmptyWord(word)){
+		if (word != textInput.headWord)
+			delWord(word);
+		return 1;
+	}
+	return 0;
+}
+
+BOOL clearWords(){
+	Element *el = textInput.headWord->begin;
+	while(el != NULL){
+		Element *te = el->next;
+		if (te == NULL || te->father != el->father){
+			delWord(el->father);
+		}
+		el = te;
+	}
+	textInput.headWord = createNewWord();
+	return TRUE;
+}
+
+BOOL clearElements(){
+	Element *el = textInput.headWord->begin;
+	while(el != NULL){
+		Element *e = el;
+		el = el->next;
+		delElement(e);
+	}
+	textInput.headWord = createNewWord();
+	textInput.curElement = NULL;
+	return TRUE;
+}
+
+BOOL clearText(){
+	if (!clearElements()) return FALSE;
+	textInput.headWord = createNewWord();
+	textInput.curElement = NULL;
+	return TRUE;
+}
 
 BOOL isFunction(Word *word){
 	return FALSE;
 }
 BOOL isOperator(Word *word){
 	Element *el = word->begin;
-	if (el->next == NULL && (
-		el->c == '*' || 
-		el->c == '-' ||
-		el->c == '+' ||
-		el->c == '=' ||
-		el->c == '/' ||
-		el->c == '|' ||
-		el->c == '&'
-		)){
+	int i;
+	for(i = 0; i < OPERATORNUM; ++i){
+		if (el->c == operators[i])
 			return TRUE;
 	}
 	return FALSE;
@@ -159,14 +252,24 @@ BOOL isExplain(Word *word){
 }
 BOOL isSeparate(Word *word){
 	Element *el = word->begin;
-	if (el->c == ' ' || el->c == '\t' || el->c == '\n')
+	if (el->c == ' ' || el->c == '\t')
+		return TRUE;
+	return FALSE;
+}
+BOOL isNewline(Word *word){
+	Element *el = word->begin;
+	if (el->c == '\n')
 		return TRUE;
 	return FALSE;
 }
 
 
 void checkWord(Word * word){
-	if (word->begin == NULL)
+	if (word == NULL){
+		printw("There is no word!\n");
+		return;
+	}
+	if (word->begin == word->end)
 		return;
 
 	if (isFunction(word)){
@@ -183,6 +286,8 @@ void checkWord(Word * word){
 		word->type = EXPLAIN;
 	}else if (isSeparate(word)){
 		word->type = SEPARATE;
+	}else if (isNewline(word)){
+		word->type = NEWLINE;
 	}else{
 		word->type = NORMAL;
 	}
@@ -190,6 +295,8 @@ void checkWord(Word * word){
 
 int checkSeparate(Word *word,char input){
 	switch(word->type){
+		case EMPTY:
+			break;
 		case FUNCTION:
 		case KEYWORD:
 		case OPERATOR:
@@ -210,9 +317,13 @@ int checkSeparate(Word *word,char input){
 			}
 			break;
 		case SEPARATE:
-			if (input != '\n' && input != ' ' & input != '\t'){
+			if (input != ' ' & input != '\t'){
 				return 1;
 			}
+			break;
+		case NEWLINE:
+			if (input != '\n')
+				return 1;
 			break;
 		case EXPLAIN:
 			if (input == '\n'){
@@ -224,25 +335,54 @@ int checkSeparate(Word *word,char input){
 }
 
 void linkElementInWord(Element *el,Word *word){
+	if (word == NULL || el == NULL) return;
 	if (word->begin == word->end){
 		word->begin = el;
-		word->end = el->next;
-	}else{
-		word->end = el;
 	}
+	word->end = el->next;
 	word->count++;
+	el->father = word;
+	word->type = NORMAL;
+}
+
+BOOL isCombine(Word *w1,Word*w2){
+	if (w1 == NULL || w2 == NULL) return FALSE;
+	BOOL result = FALSE;
+	if (w1->type == EMPTY || w2->type == EMPTY) result = TRUE;
+	switch (w1->type){
+		case FUNCTION:
+		case KEYWORD:
+		case OPERATOR:
+		case NORMAL:
+			if (w2->type != SEPARATE)
+				result = TRUE;
+			break;
+		case SEPARATE:
+			if (w2->type != NORMAL && w2->type != OPERATOR && 
+				w2->type != KEYWORD && w2->type != FUNCTION)
+				result = TRUE;
+		case STRING:
+		case STRING_DOT:
+		case EXPLAIN:
+			result = TRUE;
+			break;
+	}
+	if (result == TRUE){
+		w1 = combineWords(w1,w2);
+	}
+	return result;
 }
 
 Word *rebuildWord(Word *word){
+	if (word == NULL) return NULL;
+
 	Element *el = word->begin;
 
-	Word *head = createNewWord();
-	Word *curWord = head;
-	curWord->begin = el;
-	curWord->end = el->next;
-	curWord->count++;
+	if (el == word->end) 
+		return word;
+	Word *headWord = createNewWord();
+	Word *curWord = headWord;
 
-	el = el->next;
 	while(el != word->end){
 		int sign = checkSeparate(curWord,el->c);
 		switch (sign){
@@ -259,55 +399,33 @@ Word *rebuildWord(Word *word){
 		checkWord(curWord);
 		el = el->next;
 	}
-	word->previous->next = head;
-	curWord->next = word->next;
-	word->next->previous = curWord;
-	head->previous = word->previous;
-	free(word);
+	if (headWord != curWord && isEmptyWord(curWord)){
+		Word *tmp = curWord;
+		curWord = tmp->previous;
+		delWord(tmp);
+	}
+	replaceWord(word,headWord,curWord);
 	return curWord;
 }
 
-BOOL isCombine(Word *w1,Word*w2){
-	BOOL result = FALSE;
-	switch (w1->type){
-		case FUNCTION:
-		case KEYWORD:
-		case OPERATOR:
-		case NORMAL:
-			if (w2->type != SEPARATE)
-				result = TRUE;
-			break;
-		case STRING:
-			if (w2->type == STRING)
-				result = TRUE;
-			break;
-		case STRING_DOT:
-			if (w2->type == STRING_DOT)
-				result = TRUE;
-			break;
-		case SEPARATE:
-			if (w2->type == SEPARATE)
-				result = TRUE;
-			break;
-		case EXPLAIN:
-			result = TRUE;
-			break;
+void resetWords(){
+	Element *el = textInput.headWord->begin;
+	clearWords();
+	textInput.headWord = createNewWord();
+	while(el != NULL){
+		linkElementInWord(el,textInput.headWord);
+		el = el->next;
 	}
-	if (result == TRUE){
-		w1->next = w2->next;
-		if (w2->next != NULL)
-			w2->next->previous = w1;
-		w1->end = w2->end;
-		free(w2);
-	}
-	return result;
+	rebuildWord(textInput.headWord);
 }
 
+
 void rebuildWords(Word *word){
-	Word *word;
+	resetWords();
+return;
 	do{
 		word = rebuildWord(word);
-	}while (isCombine(word,word->next) == TRUE);
+	}while (word != NULL && isCombine(word,word->next));
 }
 
 void addCharInBuffer(char input){
@@ -326,6 +444,8 @@ void addchar(char input){
 		case InLoad:
 			addCharInTemp(input);
 			break;
+		case InSelect:
+			doDelete();
 		case InDefault:
 			addCharInBuffer(input);
 			break;
