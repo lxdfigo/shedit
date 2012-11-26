@@ -31,10 +31,12 @@ SystemStatus shSystem;
 
 void initSystem(){
 	shSystem.isQuit = FALSE;
-	shSystem.lastState = InDefault;
-	shSystem.state = InDefault;
+	shSystem.lastState = InTextEdit;
+	shSystem.state = InTextEdit;
 	shSystem.menuIndex = 0;
 	shSystem.menuSection = 0;
+	shSystem.subState = InDefault;
+	shSystem.curCommand = NULL;
 	memset(shSystem.fileName,0,sizeof(shSystem.fileName));
 }
 
@@ -58,9 +60,18 @@ void destroyCurses(){
 }
 
 void setSystemState(enum SystemState state){
-	shSystem.lastState = shSystem.state;
+	if (shSystem.lastState != shSystem.state)
+		shSystem.lastState = shSystem.state;
 	shSystem.state = state;
 }
+void setSubState(enum SubState state){
+	shSystem.subState = state;
+}
+BOOL isSubState(enum SubState state){
+	if (shSystem.subState == state)
+		return TRUE;
+	return FALSE;
+};
 void revertSystemState(){
 	setSystemState(shSystem.lastState);
 }

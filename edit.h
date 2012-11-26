@@ -46,6 +46,7 @@ void rebuildWords(Word *w);
 
 void eraseSelected(Element *begin,Element *end);
 void loadFileinBuffer(char *filename);
+int getElementLine(Element * el);
 
 void doCut();
 void doCopy();
@@ -56,4 +57,6 @@ void doDelete();
 void doRun();
 void doStep();
 void doSetBreakpoint();
+
+void resetState();
 #endif

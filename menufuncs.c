@@ -44,7 +44,6 @@ void doUndo(){
 
 void doCut(){
 	if (textInput.selected_begin == NULL) return;
-	eraseSelected(textInput.selected_begin,textInput.selected_end);
 
 	textInput.curElement = textInput.selected_begin->previous;
 
@@ -68,10 +67,8 @@ void doCut(){
 
 	textInput.copy_begin = textInput.selected_begin;
 	textInput.copy_end = textInput.selected_end;
-	textInput.selected_begin = NULL;
-	textInput.selected_end = NULL;
-	if (isSystemState(InSelect))
-		setSystemState(InDefault);
+
+	resetState();
 }
 void copyElements(Element **begin,Element **end){
 	if (*begin == NULL || *end == NULL) return;
@@ -109,17 +106,12 @@ void copyElements(Element **begin,Element **end){
 
 void doCopy(){
 	if (textInput.selected_begin == NULL) return;
-	eraseSelected(textInput.selected_begin,textInput.selected_end);
 
 	textInput.copy_begin = textInput.selected_begin;
 	textInput.copy_end = textInput.selected_end;
 	copyElements(&textInput.copy_begin,&textInput.copy_end);
 
-	textInput.selected_begin = NULL;
-	textInput.selected_end = NULL;
-	if (isSystemState(InSelect)){
-		setSystemState(InDefault);
-	}
+	resetState();
 }
 void doPaste(){
 	if (textInput.copy_begin == NULL) return;
@@ -128,7 +120,7 @@ void doPaste(){
 		el = textInput.headWord->begin;
 		if (el != NULL)
 			el->previous = textInput.copy_end;
-		textInput.copy_end = el;
+		textInput.copy_end->next = el;
 		textInput.headWord = textInput.copy_begin->father;
 		rebuildWords(textInput.headWord);
 	}else{
@@ -137,9 +129,9 @@ void doPaste(){
 		textInput.copy_end->next = el->next;
 		el->next = textInput.copy_begin;
 		textInput.copy_begin->previous = el;
-		textInput.curElement = textInput.copy_end;
 		rebuildWords(el->father);
 	}
+	textInput.curElement = textInput.copy_end;
 
 	textInput.copy_begin = NULL;
 	textInput.copy_end = NULL;
@@ -166,23 +158,41 @@ void doEdit(){
 			break;
 	}
 }
-void doRun(){
-	setSystemState(InDebug);
-	char command[1024];
-	char result[1024];
-	Element *el = textInput.headWord->begin;
+Element* getCurCommand(char *command,Element *begin){
 	int i = 0;
+	Element *el = begin;
+	if (el == NULL) el = textInput.headWord->begin;
+
+	while(el != NULL && el == '\n') el = el->next;
 	while(el != NULL && el->c != '\n'){
 		command[i] = el->c;
 		el = el->next;
 		i++;
 	}
 	command[i] = '\n';
-	runCommand(command,result);
-	printw("%s",result);
+	return el;
+}
+void doRun(){
+	setSystemState(InDebug);
+	char command[1024];
+	int i = 0;
+	int ln = getElementLine(textInput.curCommand);
+	while (textInput.curCommand != NULL){
+		textInput.curCommand = getCurCommand(command,textInput.curCommand);
+		runCommand(command,shSystem.status);
+		ln++;
+		Point *p = textInput.breakpoints;
+		while (p != NULL){
+			if (p->ln == ln) return;
+			p = p->next;
+		}
+	}
 }
 void doStep(){
-
+	setSystemState(InDebug);
+	char command[1024];
+	textInput.curCommand = getCurCommand(command,textInput.curCommand);
+	runCommand(command,shSystem.status);
 }
 void doSetBreakpoint(){
 	Point * p = textInput.breakpoints;
@@ -216,10 +226,10 @@ void doDebug(){
 	}
 }
 void doAbout(){
-	setSystemState(InAbout);
+	setSubState(InAbout);
 }
 void doManual(){
-	setSystemState(InManual);
+	setSubState(InManual);
 }
 void doHelp(){
 	switch(shSystem.menuSection){
@@ -237,7 +247,7 @@ void doNewFile(){
 }
 
 void doSave(){
-	setSystemState(InSave);
+	setSubState(InSave);
 	if (shSystem.fileName[0] != 0){
 		memcpy(textInput.tmpStr,shSystem.fileName,sizeof(textInput.tmpStr));
 	}else{
@@ -247,7 +257,7 @@ void doSave(){
 }
 
 void doLoad(){
-	setSystemState(InLoad);
+	setSubState(InLoad);
 	memset(textInput.tmpStr,0,sizeof(textInput.tmpStr));
 	textInput.tmpCur = 0;
 }
@@ -275,6 +285,7 @@ void doFile(){
 
 
 void doMenu(){
+	revertSystemState();
 	switch (shSystem.menuIndex){
 		case 0:
 			doFile();

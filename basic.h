@@ -36,10 +36,13 @@
 //#define FALSE 0
 
 enum SystemState{
+	InQuit,
 	InMenu,
 	InTextEdit,
-	InDebug,
-	InQuit,
+	InDebug
+};
+
+enum SubState{
 	InLoad,
 	InSave,
 	InAbout,
@@ -48,20 +51,16 @@ enum SystemState{
 	InDefault
 };
 
-typedef struct _Point{
-	int ln;
-	int col;
-	struct _Point *next;
-	struct _Point *previous;
-}Point;
 
 typedef struct {
 	int menuIndex;
 	int menuSection;
 	BOOL isQuit;
 	char fileName[1024];
+	char status[1024];
 	int lastState;
 	int state;
+	int subState;
 }SystemStatus;
 
 enum WordType{
@@ -96,13 +95,22 @@ typedef struct _Word{
 	struct _Word *previous;
 }Word;
 
+typedef struct _Point{
+	int ln;
+	int col;
+	struct _Point *next;
+	struct _Point *previous;
+}Point;
+
 typedef struct{
 	char tmpStr[1024];
 	short tmpCur;
 	Word *headWord;
 	int curLn,curCol;
 	Point *breakpoints;
+	Element *curCommand;
 	Element *screenBeginElement;
+	Element *screenEndElement;
 	Element *curElement;
 	Element *selected_begin,* selected_end, *selected_center;
 	Element *copy_begin,* copy_end;

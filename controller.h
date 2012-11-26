@@ -30,6 +30,9 @@
 void initCurses();
 void destroyCurses();
 
+void setSubState(enum SubState state);
+BOOL isSubState(enum SubState state);
+
 void setSystemState(enum SystemState state);
 void revertSystemState();
 BOOL isSystemState(enum SystemState state);

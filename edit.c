@@ -363,11 +363,11 @@ void linkElementInWord(Element *el,Word *word){
 	if (word == NULL || el == NULL) return;
 	if (word->begin == word->end){
 		word->begin = el;
+		word->type = NORMAL;
 	}
 	word->end = el->next;
 	word->count++;
 	el->father = word;
-	word->type = NORMAL;
 }
 
 BOOL isCombine(Word *w1,Word*w2){
@@ -462,17 +462,31 @@ void addCharInTemp(char input){
 	textInput.tmpStr[textInput.tmpCur] = input;
 	textInput.tmpCur++;
 }
-
-void addchar(char input){
-	switch(shSystem.state){
+void addCharInMenu(char input){
+	switch(shSystem.subState){
 		case InSave:
 		case InLoad:
 			addCharInTemp(input);
 			break;
+	}
+}
+void addCharInEdit(char input){
+	switch(shSystem.subState){
 		case InSelect:
 			doDelete();
+			break;
 		case InDefault:
 			addCharInBuffer(input);
+			break;
+	}
+}
+void addchar(char input){
+	switch(shSystem.state){
+		case InMenu:
+			addCharInMenu(input);
+			break;
+		case InTextEdit:
+			addCharInEdit(input);
 			break;
 	}
 }

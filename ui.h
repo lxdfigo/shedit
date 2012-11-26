@@ -32,7 +32,6 @@ void destroyUIModule();
 
 void drawMenu();
 void drawEditFrame();
-void drawStatusFrame();
 
 void drawSelectMenu(int index,int selSec);
 void drawEditRoom();

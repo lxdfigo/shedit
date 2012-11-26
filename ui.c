@@ -85,11 +85,6 @@ typedef struct{
 
 }ColorSultion;
 
-typedef struct{
-	int x;
-	int y;
-}Point;
-
 WINDOW *inputWin;
 ColorSultion colorsln;
 CMenu menu = {80,1,8,4,{
@@ -107,7 +102,7 @@ CMenu menu = {80,1,8,4,{
 			{20,3,"DEBUG", {
 				"Run",
 					"Step",
-					"Set Breakpoint"},
+					"Set Breakpoint"}},
 				{8,2,"HELP",{
 					"Manual",
 					"About"}}
@@ -190,10 +185,8 @@ void destroyUIModule(){
 
 void resetView(){
 	drawMenu();
-	drawEditFrame();
-	drawStatusFrame();
-	drawStatusRoom();
 	drawEditRoom();
+	drawStatusRoom();
 	setCurser(screen.curX,screen.curY);
 	curs_set(2);
 	refresh();
@@ -289,9 +282,6 @@ void drawMenu(){
 
 void drawEditFrame(){
 	int i;
-
-	printBg(screen.erx,screen.ery,screen.erex,screen.erey,colorsln.er_tc);
-
 	setcolor(colorsln.er_tc);
 	for(i = screen.erx; i < screen.erex; ++i){
 		gotoxy(i,screen.ery);
@@ -306,12 +296,6 @@ void drawEditFrame(){
 	gotoxy((screen.erex-screen.erx-6)/2 + screen.erx,screen.ery);
 	printw("shedit");
 }
-void drawStatusFrame(){
-
-	printBg(screen.srx,screen.sry,screen.srex,screen.srey,colorsln.sr_tc_1);
-
-}
-
 void setCurser(int x,int y){
 	gotoxy(x,y);
 }
@@ -359,36 +343,53 @@ void drawElement(Element *el){
 
 
 void drawEditRoom(){
-	drawEditFrame();
-      
+
+	printBg(screen.erx,screen.ery,screen.erex,screen.erey,colorsln.er_tc);
+
 	screen.curY = screen.ery + 1;
 	screen.curX = screen.erx;
 	gotoxy(screen.erx,screen.ery+1);
 	setcolor(colorsln.er_tc);
 	Element *el = textInput.screenBeginElement;
-	while(el != NULL){
+	while(el != textInput.screenEndElement){
 	  	drawElement(el);
 		el = el->next;
 	}
+	Point *p = textInput.breakpoints;
+	while (p != NULL){
+		gotoxy(screen.width-1,p->ln-1);
+		setcolor(colorsln.er_w_tc);
+		printw("*");
+		p = p->next;
+	}
+	drawEditFrame();
 }
 
 void drawStatusRoom(){
-	drawStatusFrame();
-	setcolor(colorsln.sr_tc_1);
-	gotoxy(screen.sry,screen.srx + 1);
-	printw("Menu - F1");
-	setcolor(colorsln.sr_tc_2);
-	gotoxy(screen.sry,screen.srex * 0.6);
-	printw("Ln");
-	setcolor(colorsln.sr_tc_3);
-	gotoxy(screen.sry,screen.srex * 0.6 + 3);
-	printw("%d",textInput.curLn);
-	setcolor(colorsln.sr_tc_2);
-	gotoxy(screen.sry,screen.srex * 0.7);
-	printw("Col ");
-	setcolor(colorsln.sr_tc_3);
-	gotoxy(screen.sry,screen.srex * 0.7 + 4);
-	printw("%d",textInput.curCol);
+	printBg(screen.srx,screen.sry,screen.srex,screen.srey,colorsln.sr_tc_1);
+
+
+	if (isSystemState(InDebug)){
+		setcolor(colorsln.sr_tc_1);
+		gotoxy(screen.srx + 1,screen.sry);
+		printw("%s",shSystem.status);
+	}else{
+		setcolor(colorsln.sr_tc_1);
+		gotoxy(screen.srx + 1,screen.sry);
+		printw("Menu - F1");
+		setcolor(colorsln.sr_tc_2);
+		gotoxy(screen.srex * 0.6,screen.sry);
+		printw("Ln");
+		setcolor(colorsln.sr_tc_3);
+		gotoxy(screen.srex * 0.6 + 3,screen.sry);
+		printw("%d",textInput.curLn);
+		setcolor(colorsln.sr_tc_2);
+		gotoxy(screen.srex * 0.7,screen.sry);
+		printw("Col ");
+		setcolor(colorsln.sr_tc_3);
+		gotoxy(screen.srex * 0.7 + 4,screen.sry);
+		printw("%d",textInput.curCol);
+	}
 }
 
 void storeWindow(int x,int y,int wid,int hei){
@@ -467,15 +468,9 @@ void drawAboutDialog(){
 		"lxdfigo@gmail.com",7,25,5);
 }
 
-void updateView(){
-	if (inputWin != NULL){
-		overwrite(inputWin, stdscr);
-		delwin(inputWin);
-		inputWin = NULL;
-	}
-	curs_set(2);
-	switch(shSystem.state){
-		case InMenu:
+void drawMenuStaff(){
+	switch(shSystem.subState){
+		case InDefault:
 			curs_set(0);
 			updateMenu();
 			break;
@@ -485,11 +480,6 @@ void updateView(){
 		case InLoad:
 			drawLoadDialog();
 			break;
-		case InDefault:
-		case InSelect:
-			drawEditRoom();
-			drawStatusRoom();
-			break;
 		case InAbout:
 			curs_set(0);
 			drawAboutDialog();
@@ -497,6 +487,23 @@ void updateView(){
 		case InManual:
 			curs_set(0);
 			drawManualDialog();
+			break;
+	}
+}
+void updateView(){
+	if (inputWin != NULL){
+		overwrite(inputWin, stdscr);
+		delwin(inputWin);
+		inputWin = NULL;
+	}
+	curs_set(2);
+	switch(shSystem.state){
+		case InMenu:
+			drawMenuStaff();
+			break;
+		case InTextEdit:
+			drawEditRoom();
+			drawStatusRoom();
 			break;
 	}
 	setCurser(screen.curX,screen.curY);

@@ -85,29 +85,44 @@ Element * findLineEnd(Element *el,int *sub){
 	return el;
 
 }
+int getElementLine(Element * el){
+	if (el == NULL) return 1;
+	int n = 0;
+	el = findLineHead(el,&n);
+	int count = 1;
+	while(el != NULL){
+		el = el->previous;
+		el = findLineHead(el,&n);
+		count++;
+	}
+	return count;
+}
 void updateScreenBeginElement(){
 	int upline = screen.erey - screen.ery - 4;
 	if (textInput.curElement == NULL){
 		textInput.screenBeginElement = textInput.headWord->begin;
-		return;
+	}else{
+		Element *el = textInput.curElement;
+		int n = 0;
+		el = findLineHead(el,&n);
+		int Ln = 1;
+		int Col = n + 1;
+		Element *head = el;
+		while(el != NULL){
+			el = el->previous;
+			Ln++;
+			if (Ln == upline) head = el;
+			el = findLineHead(el,&n);
+		}
+		textInput.curCol = Col;
+		textInput.curLn = Ln;
+
+		if (head == NULL)
+			textInput.screenBeginElement = textInput.headWord->begin;
+		else
+			textInput.screenBeginElement = head->next;
 	}
-	Element *el = textInput.curElement;
-	int n = 0;
-	el = findLineHead(el,&n);
-	int count = 1;
-	Element *head = el;
-	while(el != NULL){
-		el = el->previous;
-		count++;
-		if (count == upline) head = el;
-	}
-	textInput.curCol = n + 1;
-	textInput.curLn = count;
-	
-	if (head == NULL)
-		textInput.screenBeginElement = textInput.headWord->begin;
-	else
-		textInput.screenBeginElement = head->next;
+	textInput.screenEndElement = NULL;
 }
 void saveBufferInFile(char *filename){
 	FILE *file = NULL;
@@ -119,11 +134,10 @@ void saveBufferInFile(char *filename){
 		el = el->next;
 	}
 	fclose(file);
-	memcpy(shSystem.fileName,filename,sizeof(shSystem.fileName));
 }
 
 void loadFileinBuffer(char *filename){
-	clearElements();
+	clearText();
 	int i = 0,n = 0;
 	FILE *file = NULL;
 	file = fopen(filename,"r+");
@@ -136,22 +150,22 @@ void loadFileinBuffer(char *filename){
 		}
 	}
 	fclose(file);
-	memcpy(shSystem.fileName,filename,sizeof(shSystem.fileName));
 	updateScreenBeginElement();
 }
 void saveFile(){
 	if (textInput.tmpStr[0] != 0){
 		saveBufferInFile(textInput.tmpStr);
+		memcpy(shSystem.fileName,textInput.tmpStr,sizeof(shSystem.fileName));
 	}
 	revertSystemState();
 }
 
 void loadFile(){
 	if (textInput.tmpStr[0] != 0){
-		clearText();
 		loadFileinBuffer(textInput.tmpStr);
+		memcpy(shSystem.fileName,textInput.tmpStr,sizeof(shSystem.fileName));
 	}
-	revertSystemState();
+	setSystemState(InTextEdit);
 }
 
 BOOL isValid(int input){
@@ -160,24 +174,39 @@ BOOL isValid(int input){
 	}
 	return FALSE;
 }
+void checkMenuCommand(){
+	switch(shSystem.subState){
+		case InDefault:
+			doMenu();
+		case InSave:
+			saveFile();
+			break;
+		case InLoad:
+			loadFile();
+			break;
+		case InAbout:
+		case InManual:
+			checkMenu();
+			break;
+	}
+}
 void checkCommand(){
-	if (isSystemState(InMenu)){
-		doMenu();
-	}else if (isSystemState(InSave)){
-		saveFile();
-	}else if (isSystemState(InLoad)){
-		loadFile();
-	}else if (isSystemState(InAbout) || isSystemState(InManual)){
-		setSystemState(InDefault);
-	}else{
-		addchar('\n');
+	switch(shSystem.state){
+		case InMenu:
+			checkMenuCommand();
+			break;
+		case InTextEdit:
+			addchar('\n');
+			break;
 	}
 }
 void checkMenu(){
 	if (isSystemState(InMenu)){
+		resetState();
 		revertSystemState();
 	}else{
 		setSystemState(InMenu);
+		setSubState(InDefault);
 	}
 }
 
@@ -213,7 +242,8 @@ void deleteSelectedWords(){
 }
 
 void doDelete(){
-	if (isSystemState(InDefault)){
+	if (!isSystemState(InTextEdit)) return;
+	if (isSubState(InDefault)){
 		Element *el = textInput.curElement;
 		if (el == NULL){ 
 			el = textInput.headWord->begin;
@@ -221,22 +251,23 @@ void doDelete(){
 			el = el->next;
 		}
 		deleteElementInWord(el);
-	}else if(isSystemState(InSelect)){
+	}else if(isSubState(InSelect)){
 		deleteSelectedWords();
-		setSystemState(InDefault);
+		setSubState(InDefault);
 	}
 }
 
 void doBackspace(){
-	if (isSystemState(InDefault)){
+	if (!isSystemState(InTextEdit)) return;
+	if (isSubState(InDefault)){
 		Element *el = textInput.curElement;
 		if (el != NULL){
 			textInput.curElement = el->previous;
 			deleteElementInWord(el);
 		}
-	}else if(isSystemState(InSelect)){
+	}else if(isSubState(InSelect)){
 		deleteSelectedWords();
-		setSystemState(InDefault);
+		setSubState(InDefault);
 	}
 }
 
@@ -272,33 +303,35 @@ BOOL isElementAheadElement(Element *head, Element *behind){
 }
 
 void getSelectElements(){
-	if (isSystemState(InSelect)){
-		eraseSelected(textInput.selected_begin,textInput.selected_end);
-		Element *el= textInput.curElement;
-		if (isElementAheadElement(textInput.selected_center,el)){
-			if (textInput.selected_center == NULL){
-				textInput.selected_begin = textInput.headWord->begin;
-			}else{
-				textInput.selected_begin = textInput.selected_center->next;
-			}
-			textInput.selected_end = el;
-		}else if (el != textInput.selected_center){
-			if (el == NULL){
-				textInput.selected_begin = textInput.headWord->begin;
-			}else{
-				textInput.selected_begin = el->next;
-			}
-			textInput.selected_end = textInput.selected_center;
+	if (!isSubState(InSelect)) return;
+
+	eraseSelected(textInput.selected_begin,textInput.selected_end);
+	textInput.selected_begin = NULL;
+	textInput.selected_end = NULL;
+	Element *el= textInput.curElement;
+	if (isElementAheadElement(textInput.selected_center,el)){
+		if (textInput.selected_center == NULL){
+			textInput.selected_begin = textInput.headWord->begin;
+		}else{
+			textInput.selected_begin = textInput.selected_center->next;
 		}
-		setSelected(textInput.selected_begin,textInput.selected_end)
+		textInput.selected_end = el;
+	}else if (el != textInput.selected_center){
+		if (el == NULL){
+			textInput.selected_begin = textInput.headWord->begin;
+		}else{
+			textInput.selected_begin = el->next;
+		}
+		textInput.selected_end = textInput.selected_center;
 	}
+	setSelected(textInput.selected_begin,textInput.selected_end)
 }
 
 
 void moveUp(){
 	if (isSystemState(InMenu){
 		shSystem.menuSection--;
-	}else if (isSystemState(InDefault) || isSystemState(InSelect)){
+	}else if (isSystemState(InTextEdit)){
 		int n1 = 0, n2 = 0, i = 0, n = 0;
 		if (textInput.curElement == NULL) return;
 		Element *el = findLineHead(textInput.curElement,&n1);
@@ -316,14 +349,14 @@ void moveUp(){
 			}
 			textInput.curElement = el;
 		}
+		getSelectElements();
 	}
-	getSelectElements();
 }
 
 void moveDown(){
 	if (isSystemState(InMenu)){
 		shSystem.menuSection++;
-	}else if (isSystemState(InDefault) || isSystemState(InSelect)){
+	}else if (isSystemState(InTextEdit)){
 		int i = 0, n = 0;
 		Element *el = textInput.curElement;
 		el = findLineEnd(el,&n);
@@ -335,36 +368,36 @@ void moveDown(){
 			}
 			textInput.curElement = el;
 		}
+		getSelectElements();
 	}
-	getSelectElements();
 }
 
 void moveLeft(){
 	if (isSystemState(InMenu)){
 		shSystem.menuIndex--;
-	}else if (isSystemState(InDefault) || isSystemState(InSelect)){
+	}else if (isSystemState(InTextEdit)){
 		if (textInput.curElement != NULL){
 			textInput.curElement = textInput.curElement->previous;
 		}
+		getSelectElements();
 	}
-	getSelectElements();
 }
 
 void moveRight(){
 	if (isSystemState(InMenu)){
 		shSystem.menuIndex++;
-	}else if (isSystemState(InDefault) || isSystemState(InSelect)){
-	  if (textInput.curElement == NULL ){
+	}else if (isSystemState(InTextEdit)){
+		if (textInput.curElement == NULL ){
 			textInput.curElement = textInput.headWord->begin;
-	  }else if (textInput.curElement->next != NULL){
+		}else if (textInput.curElement->next != NULL){
 			textInput.curElement = textInput.curElement->next;
-	  }
+		}
+		getSelectElements();
 	}
-	getSelectElements();
 }
 
 void doPageUp(){
-	if (!isSystemState(InDefault)) return;
+	if (!isSystemState(InTextEdit)) return;
 	int i;
 	int upline = screen.erey - screen.ery - 4;
 	for(i = 0; i < upline; ++i){
@@ -374,7 +407,7 @@ void doPageUp(){
 }
 
 void doPageDown(){
-	if (!isSystemState(InDefault)) return;
+	if (!isSystemState(InTextEdit)) return;
 	int i;
 	int upline = screen.erey - screen.ery - 4;
 	for(i = 0; i < upline; ++i){
@@ -384,12 +417,17 @@ void doPageDown(){
 }
 
 void doSelect(){
-	if (isSystemState(InDefault)){
+	if (isSystemState(InTextEdit)){
 		eraseSelected(textInput.selected_begin,textInput.selected_end);
-		setSystemState(InSelect);
-		textInput.selected_center = textInput.curElement;
 		textInput.selected_begin = NULL;
 		textInput.selected_end = NULL;
+		textInput.selected_center = NULL;
+		if (!isSubState(InSelect)){
+			setSubState(InSelect);
+			textInput.selected_center = textInput.curElement;
+		}else{
+			setSubState(InDefault);
+		}
 	}
 }
 Element *getEndElement(Element *begin){
@@ -405,6 +443,13 @@ void selectedAll(){
 	textInput.selected_end = getEndElement(textInput.selected_begin);
 }
 
+void resetState(){
+	eraseSelected(textInput.selected_begin,textInput.selected_end);
+	textInput.selected_begin = NULL;
+	textInput.selected_end = NULL;
+	setSystemState(InTextEdit);
+	setSubState(InDefault);
+}
 BOOL inputHandler(){
 	int input = getch();
 
@@ -424,10 +469,8 @@ BOOL inputHandler(){
 		case '\n'://KEY_ENTER:
 			checkCommand();
 			break;
-		case KEY_EXIT:
-			if (!isSystemState(InDefault)){
-				setSystemState(InDefault);
-			}
+		case 27://KEY_EXIT:
+			resetState();
 			break;
 		case 330://KEY_DELETE
 			doDelete();
