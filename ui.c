@@ -301,13 +301,13 @@ void setCurser(int x,int y){
 }
 
 void drawElement(Element *el){
-	if (el == NULL || el->father == NULL){
+	if (el == NULL){
 		printw("There is no father of element or no element!\n");
 		return;
 	}
 	int i = 0;
-
-	switch(el->father->type){
+	if (el->father != NULL){
+		switch(el->father->type){
 		case NORMAL:
 		case SEPARATE:
 		case NEWLINE:
@@ -331,6 +331,7 @@ void drawElement(Element *el){
 		case KEYWORD:
 			setcolor(colorsln.er_v_ktc);
 			break;
+		}
 	}
 	if (el->isSelected == TRUE)
 		setcolor(colorsln.er_s_tc_1);
@@ -357,7 +358,7 @@ void drawEditRoom(){
 	}
 	Point *p = textInput.breakpoints;
 	while (p != NULL){
-		gotoxy(screen.width-1,p->ln-1);
+		gotoxy(screen.width-1,p->ln);
 		setcolor(colorsln.er_w_tc);
 		printw("*");
 		p = p->next;
@@ -439,8 +440,9 @@ void drawInputDialog(char *str,int len,int w,int h){
 	getyx(stdscr,screen.curY,screen.curX);
 }
 
-void drawMessageDialog(char *title,int tlen,char *str,int len,int w,int h){
+void drawMessageDialog(char *title,int tlen,char **str,int strlen,int len,int w,int h){
 	int x,y;
+	int i;
 	x = (screen.width - w) / 2;
 	y = (screen.height - h) / 2 - 1;
 
@@ -450,7 +452,9 @@ void drawMessageDialog(char *title,int tlen,char *str,int len,int w,int h){
 	setcolor(colorsln.mr_tc_1);
 	mvprintw(y + 1,x + (w - tlen)/2,"%s",title);
 
-	mvprintw(y + 3,x + len,"%s",str);
+	for(i = 0; i < strlen; ++i){
+		mvprintw(y + 3 + i,x + len,"%s",str[i]);
+	}
 }
 void drawSaveDialog(){
 	drawInputDialog("Save",4,35,7);
@@ -460,12 +464,22 @@ void drawLoadDialog(){
 	drawInputDialog("Load",4,35,7);
 }
 void drawManualDialog(){
-	drawMessageDialog("Manual",6,
-		"Menu - F1\nRun - F5\nStep Over - F10\nSet Breakpoint - F9\nSelect - Ctrl+L\nSelectAll - Ctrl+A\nCut - Ctrl+X\nCopy - Ctrl+C\nPaste - Ctrl+V\nSave - Ctrl+S",3,35,15);
+	char *strs[10] = {
+		"Menu - F1",
+		"Run - F5",
+		"Step Over - F10",
+		"Set Breakpoint - F9",
+		"Select - Ctrl+L",
+		"SelectAll - Ctrl+A",
+		"Cut - Ctrl+X",
+		"Copy - Ctrl+C",
+		"Paste - Ctrl+V",
+		"Save - Ctrl+S"};
+	drawMessageDialog("Manual",6,strs,10,3,35,15);
 }
 void drawAboutDialog(){
-	drawMessageDialog("Author",6,
-		"lxdfigo@gmail.com",7,25,5);
+	char *strs[1] = {"lxdfigo@gmail.com"};
+	drawMessageDialog("Author",6,strs,1,7,25,5);
 }
 
 void drawMenuStaff(){
@@ -480,13 +494,13 @@ void drawMenuStaff(){
 		case InLoad:
 			drawLoadDialog();
 			break;
-		case InAbout:
-			curs_set(0);
-			drawAboutDialog();
-			break;
 		case InManual:
 			curs_set(0);
 			drawManualDialog();
+			break;
+		case InAbout:
+			curs_set(0);
+			drawAboutDialog();
 			break;
 	}
 }
@@ -502,6 +516,7 @@ void updateView(){
 			drawMenuStaff();
 			break;
 		case InTextEdit:
+		case InDebug:
 			drawEditRoom();
 			drawStatusRoom();
 			break;

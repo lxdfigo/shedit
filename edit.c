@@ -56,29 +56,13 @@ Element *copyElement(Element *input){
 }
 Element * appNewElement(Element *element,char input){
 	Element *el = createElement(input);
-	if (element == NULL){
-		Word *word = textInput.headWord;
-		textInput.headWord = createNewWord();
-		el->father = textInput.headWord;
-		el->father->begin = el;
-		if (word != NULL){
-			word->previous = textInput.headWord;
-			textInput.headWord->next = word;
-			el->next = word->begin;
-			if (word->begin != NULL)
-				word->begin->previous = el;
-		}
-		el->father->end = el->next;
-	}else{
+	if (element != NULL){
 		el->previous = element;
 		el->next = element->next;
 		if (element->next != NULL)
 			element->next->previous = el;
 		element->next = el;
-		el->father = element->father;
 	}
-	el->father->type = NORMAL;
-	el->father->count++;
 	return el;
 }
 
@@ -124,9 +108,9 @@ BOOL replaceWord(Word *word,Word *headWord,Word * endWord){
 		word->next->previous = endWord;
 	endWord->next = word->next;
 
-	if (textInput.headWord == word){
-		textInput.headWord = headWord;
-	}
+//	if (textInput.headWord == word){
+//		textInput.headWord = headWord;
+//	}
 
 	free(word);
 	return TRUE;
@@ -163,9 +147,6 @@ BOOL delWord(Word *word){
 	if (word->previous != NULL)
 		word->previous->next = word->next;
 
-	if (textInput.headWord == word){
-		textInput.headWord = word->next;
-	}
 	free(word);
 	return TRUE;
 }
@@ -173,30 +154,27 @@ BOOL delWord(Word *word){
 int delElement(Element *element){
 	if (element == NULL) return;
 	Word *word = element->father;
-	if (word == NULL){
-		printw("There is no father of Element!\n");
-		return;
-	}
-	if (element == word->begin){
-		word->begin = element->next;
-	}
 	if (element->previous != NULL)
 		element->previous->next = element->next;
 	if (element->next != NULL)
 		element->next->previous = element->previous;
 
 	free(element);
-	word->count--;
-	if (isEmptyWord(word)){
-		if (word != textInput.headWord)
+	if (word != NULL){
+		if (element == word->begin){
+			word->begin = element->next;
+		}
+		word->count--;
+		if (isEmptyWord(word)){
 			delWord(word);
-		return 1;
+			return 1;
+		}
 	}
 	return 0;
 }
 
 BOOL clearWords(){
-	Element *el = textInput.headWord->begin;
+	Element *el = textInput.beginElement;
 	while(el != NULL){
 		Element *te = el->next;
 		if (te == NULL || te->father != el->father){
@@ -204,26 +182,25 @@ BOOL clearWords(){
 		}
 		el = te;
 	}
-	textInput.headWord = createNewWord();
 	return TRUE;
 }
 
 BOOL clearElements(){
-	Element *el = textInput.headWord->begin;
+	Element *el = textInput.beginElement;
 	while(el != NULL){
 		Element *e = el;
 		el = el->next;
 		delElement(e);
 	}
-	textInput.headWord = createNewWord();
 	textInput.curElement = NULL;
+	textInput.beginElement = NULL;
 	return TRUE;
 }
 
 BOOL clearText(){
 	if (!clearElements()) return FALSE;
-	textInput.headWord = createNewWord();
 	textInput.curElement = NULL;
+	textInput.beginElement = NULL;
 	return TRUE;
 }
 
@@ -434,33 +411,39 @@ Word *rebuildWord(Word *word){
 }
 
 void resetWords(){
-	Element *el = textInput.headWord->begin;
+	Element *el = textInput.beginElement;
 	clearWords();
-	textInput.headWord = createNewWord();
+//	textInput.headWord = createNewWord();
 	while(el != NULL){
-		linkElementInWord(el,textInput.headWord);
+//		linkElementInWord(el,textInput.headWord);
 		el = el->next;
 	}
-	rebuildWord(textInput.headWord);
+//	rebuildWord(textInput.headWord);
 }
 
 
 void rebuildWords(Word *word){
 	resetWords();
 return;
-	do{
-		word = rebuildWord(word);
-	}while (word != NULL && isCombine(word,word->next));
+//	do{
+//		word = rebuildWord(word);
+//	}while (word != NULL && isCombine(word,word->next));
 }
 
 void addCharInBuffer(char input){
-	textInput.curElement = appNewElement(textInput.curElement,input);
-	rebuildWords(textInput.curElement->father);
+	Element *el = appNewElement(textInput.curElement,input);
+	if (textInput.curElement == NULL){
+		textInput.beginElement = el;
+	}
+	textInput.curElement = el;
+	//rebuildWords(textInput.curElement->father);
 }
 
 void addCharInTemp(char input){
-	textInput.tmpStr[textInput.tmpCur] = input;
-	textInput.tmpCur++;
+	if (textInput.tmpCur < sizeof(textInput.tmpStr) - 1){
+		textInput.tmpStr[textInput.tmpCur] = input;
+		textInput.tmpCur++;
+	}
 }
 void addCharInMenu(char input){
 	switch(shSystem.subState){
@@ -474,7 +457,6 @@ void addCharInEdit(char input){
 	switch(shSystem.subState){
 		case InSelect:
 			doDelete();
-			break;
 		case InDefault:
 			addCharInBuffer(input);
 			break;

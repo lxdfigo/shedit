@@ -36,7 +36,6 @@ void initSystem(){
 	shSystem.menuIndex = 0;
 	shSystem.menuSection = 0;
 	shSystem.subState = InDefault;
-	shSystem.curCommand = NULL;
 	memset(shSystem.fileName,0,sizeof(shSystem.fileName));
 }
 

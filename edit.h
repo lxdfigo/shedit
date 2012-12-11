@@ -45,7 +45,7 @@ Word* createNewWord();
 void rebuildWords(Word *w);
 
 void eraseSelected(Element *begin,Element *end);
-void loadFileinBuffer(char *filename);
+bool loadFileinBuffer(char *filename);
 int getElementLine(Element * el);
 
 void doCut();

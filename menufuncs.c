@@ -30,10 +30,12 @@ void runCommand(char *command,char *result){
 	if ((fp = popen (command, "r")) == NULL)	{
 		return;
 	}
-	char tmp[1024];
-	while (fgets(tmp, sizeof(char) * 1024, fp) != NULL){
-		memcpy(result,tmp,sizeof(tmp));
-	}
+	int rs = 0;
+	int tmp = 0;
+	do{
+		tmp = fgets(result + rs, sizeof(char) * TEXTLENSIZE - rs, fp);
+		rs += tmp;
+	}while(rs < TEXTLENSIZE && tmp == 0);
 	pclose (fp);
 }
 
@@ -47,23 +49,20 @@ void doCut(){
 
 	textInput.curElement = textInput.selected_begin->previous;
 
+	if (textInput.selected_begin == textInput.beginElement){
+		textInput.beginElement = textInput.selected_begin->next;
+	}
+
 	if (textInput.selected_begin->previous != NULL){
 		textInput.selected_begin->previous->next = textInput.selected_end->next;
-		textInput.selected_begin->previous->father->end = textInput.selected_end->next;
 	}
-	textInput.selected_begin->father->begin = textInput.selected_begin;
 
 	if (textInput.selected_end->next != NULL){
 		textInput.selected_end->next->previous = textInput.selected_begin->previous;
-		textInput.selected_end->next->father->begin = textInput.selected_end->next;
 	}
-	textInput.selected_end->father->end = textInput.selected_end->next;
 
-	if (textInput.selected_begin->previous != NULL){
-		rebuildWords(textInput.selected_begin->previous->father);
-	}else if (textInput.selected_end->next != NULL){
-		rebuildWords(textInput.selected_end->next->father);
-	}
+	//rebuildWords(textInput.selected_begin->previous->father);
+
 
 	textInput.copy_begin = textInput.selected_begin;
 	textInput.copy_end = textInput.selected_end;
@@ -88,20 +87,11 @@ void copyElements(Element **begin,Element **end){
 		cur = tmp;
 		b = b->next;
 	}
-	end = &cur;
-	begin = &head;
 
-	//set father of all elements
-	Word *fat = createNewWord();
-	fat->begin = head;
-	fat->end = cur->next;
-	fat->type = NORMAL;
-	fat->count = count;
-	Element *el = head;
-	while(el != cur->next){
-		el->father = fat;
-		el = el->next;
-	}
+	*begin = head;
+	*end = cur;
+
+	return;
 }
 
 void doCopy(){
@@ -117,33 +107,31 @@ void doPaste(){
 	if (textInput.copy_begin == NULL) return;
 	Element *el = textInput.curElement;
 	if (el == NULL){
-		el = textInput.headWord->begin;
+		el = textInput.beginElement;
 		if (el != NULL)
 			el->previous = textInput.copy_end;
 		textInput.copy_end->next = el;
-		textInput.headWord = textInput.copy_begin->father;
-		rebuildWords(textInput.headWord);
+		textInput.beginElement = textInput.copy_begin;
 	}else{
 		if (el->next != NULL)
 			el->next->previous = textInput.copy_end;
 		textInput.copy_end->next = el->next;
 		el->next = textInput.copy_begin;
 		textInput.copy_begin->previous = el;
-		rebuildWords(el->father);
+		//need to separate two words
 	}
 	textInput.curElement = textInput.copy_end;
 
 	textInput.copy_begin = NULL;
 	textInput.copy_end = NULL;
+	resetState();
+	//rebuildWords(textInput.headWord);
 }
 void doSearch(){
 	printw("do Search\n");
 }
 void doEdit(){
 	switch(shSystem.menuSection){
-		//case 0:
-		//	doUndo();
-		//	break;
 		case 0:
 			doCut();
 			break;
@@ -161,9 +149,10 @@ void doEdit(){
 Element* getCurCommand(char *command,Element *begin){
 	int i = 0;
 	Element *el = begin;
-	if (el == NULL) el = textInput.headWord->begin;
+	if (el == NULL) el = textInput.beginElement;
 
-	while(el != NULL && el == '\n') el = el->next;
+	while(el != NULL && el->c == '\n') 
+		el = el->next;
 	while(el != NULL && el->c != '\n'){
 		command[i] = el->c;
 		el = el->next;
@@ -173,43 +162,53 @@ Element* getCurCommand(char *command,Element *begin){
 	return el;
 }
 void doRun(){
-	setSystemState(InDebug);
-	char command[1024];
 	int i = 0;
 	int ln = getElementLine(textInput.curCommand);
-	while (textInput.curCommand != NULL){
-		textInput.curCommand = getCurCommand(command,textInput.curCommand);
-		runCommand(command,shSystem.status);
-		ln++;
-		Point *p = textInput.breakpoints;
-		while (p != NULL){
-			if (p->ln == ln) return;
-			p = p->next;
+	Point *p = textInput.breakpoints;
+	unsigned int count = -1;
+	while (p != NULL){
+		if (p->ln > ln){
+			count = p->ln - ln;
+			break;
 		}
+		p = p->next;
 	}
+	for(i = 0; i < count && textInput.curCommand != NULL; ++i){
+		doStep();
+	}
+
 }
 void doStep(){
 	setSystemState(InDebug);
-	char command[1024];
+	char command[TEXTLENSIZE];
 	textInput.curCommand = getCurCommand(command,textInput.curCommand);
 	runCommand(command,shSystem.status);
 }
 void doSetBreakpoint(){
 	Point * p = textInput.breakpoints;
+
 	while (p != NULL && p->ln < textInput.curLn) p = p->next;
 
 	if (p != NULL && p->ln == textInput.curLn){
 		if (p->next != NULL) p->next->previous = p->previous;
 		if (p->previous != NULL) p->previous->next = p->next;
+		if (textInput.breakpoints == p)
+			textInput.breakpoints = p->next;
 		free(p);
 	}else{
-		Point *ins = malloc(Point);
+		Point *ins = (Point *)malloc(sizeof(Point));
 		ins->ln = textInput.curLn;
 		ins->col = textInput.curCol;
-		 p->previous = ins;
-		if (p->previous != NULL) p->previous->next = ins;
-		ins->previous = p->previous;
-		ins->next = p;
+		ins->next = NULL;
+		ins->previous = NULL;
+		if (p != NULL){
+			if (p->previous != NULL) p->previous->next = ins;
+			p->previous = ins;
+			ins->previous = p->previous;
+			ins->next = p;
+		}
+		if (p == textInput.breakpoints)
+			textInput.breakpoints = ins;
 	}
 }
 void doDebug(){
@@ -224,6 +223,7 @@ void doDebug(){
 			doSetBreakpoint();
 			break;
 	}
+	resetState();
 }
 void doAbout(){
 	setSubState(InAbout);
@@ -235,6 +235,7 @@ void doHelp(){
 	switch(shSystem.menuSection){
 		case 0:
 			doManual();
+			break;
 		case 1:
 			doAbout();
 			break;
@@ -244,15 +245,13 @@ void doHelp(){
 
 void doNewFile(){
 	clearText();
+	resetState();
 }
 
 void doSave(){
 	setSubState(InSave);
-	if (shSystem.fileName[0] != 0){
-		memcpy(textInput.tmpStr,shSystem.fileName,sizeof(textInput.tmpStr));
-	}else{
-		memset(textInput.tmpStr,0,sizeof(textInput.tmpStr));
-	}
+	memset(textInput.tmpStr,0,sizeof(textInput.tmpStr));
+	memcpy(textInput.tmpStr,shSystem.fileName,sizeof(textInput.tmpStr));
 	textInput.tmpCur = 0;
 }
 
@@ -285,7 +284,6 @@ void doFile(){
 
 
 void doMenu(){
-	revertSystemState();
 	switch (shSystem.menuIndex){
 		case 0:
 			doFile();

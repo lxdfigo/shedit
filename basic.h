@@ -34,6 +34,7 @@
 #define BOOL char
 //#define TRUE 1
 //#define FALSE 0
+#define TEXTLENSIZE 1024
 
 enum SystemState{
 	InQuit,
@@ -56,8 +57,8 @@ typedef struct {
 	int menuIndex;
 	int menuSection;
 	BOOL isQuit;
-	char fileName[1024];
-	char status[1024];
+	char fileName[TEXTLENSIZE];
+	char status[TEXTLENSIZE];
 	int lastState;
 	int state;
 	int subState;
@@ -103,15 +104,15 @@ typedef struct _Point{
 }Point;
 
 typedef struct{
-	char tmpStr[1024];
+	char tmpStr[TEXTLENSIZE];
 	short tmpCur;
-	Word *headWord;
 	int curLn,curCol;
 	Point *breakpoints;
 	Element *curCommand;
 	Element *screenBeginElement;
 	Element *screenEndElement;
 	Element *curElement;
+	Element *beginElement;
 	Element *selected_begin,* selected_end, *selected_center;
 	Element *copy_begin,* copy_end;
 }TextInput; 
